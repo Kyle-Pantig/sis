@@ -30,7 +30,7 @@ Create a `.env` file in the **backend/app** directory and a `.env.local` in the 
 DATABASE_URL="postgresql://user:password@localhost:5432/sis_db?schema=public"
 JWT_SECRET="your_secure_random_string"
 PORT=3001
-NODE=development
+NODE_ENV=development
 FRONTEND_URL="http://localhost:3000"
 RESEND_API_KEY="re_..."
 RESEND_EMAIL="your-verified-email@example.com"
