@@ -68,7 +68,7 @@ export function LoginForm({
               <div className="flex flex-col items-center gap-2 text-center">
                 <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
                 <p className="text-zinc-500 text-sm">
-                  Login to your SIS Admin account
+                  Login to your Mini SIS Admin account
                 </p>
               </div>
               <Field>
@@ -114,7 +114,7 @@ export function LoginForm({
             />
             <div className="absolute inset-0 flex items-center justify-center p-12 text-center">
               <div className="space-y-4">
-                <h3 className="text-xl font-bold">Simplify SIS</h3>
+                <h3 className="text-xl font-bold">Mini School Information System</h3>
                 <p className="text-sm text-zinc-600">The most intuitive way to manage students and academic performance.</p>
               </div>
             </div>

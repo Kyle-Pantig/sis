@@ -113,7 +113,7 @@ export function InviteForm({ token, email }: InviteFormProps) {
                         />
                         <div className="absolute inset-0 flex items-center justify-center p-12 text-center">
                             <div className="space-y-4">
-                                <h3 className="text-xl font-bold">Welcome to SIS</h3>
+                                <h3 className="text-xl font-bold">Welcome to Mini SIS</h3>
                                 <p className="text-sm text-zinc-600">Join our platform to efficiently manage student grades and records.</p>
                             </div>
                         </div>

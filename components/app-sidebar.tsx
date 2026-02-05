@@ -115,7 +115,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             >
               <Link href="/dashboard">
                 <IconInnerShadowTop className="!size-5 text-blue-600" />
-                <span className="text-base font-bold tracking-tight">SIS Admin</span>
+                <span className="text-base font-bold tracking-tight">Mini SIS Admin</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

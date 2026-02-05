@@ -18,7 +18,7 @@ const app = new Elysia()
     credentials: true,
     origin: ["http://localhost:3000", "http://127.0.0.1:3000"]
   }))
-  .get("/", () => ({ status: "Online", message: "SIS API is running" }))
+  .get("/", () => ({ status: "Online", message: "Mini SIS API is running" }))
   .group("/api", (app) =>
     app
       .use(authMiddleware)

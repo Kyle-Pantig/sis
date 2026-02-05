@@ -9,11 +9,11 @@ export class EmailService {
 
         try {
             const data = await resend.emails.send({
-                from: "SIS Admin <buildwithkyle@kylepantig.site>",
+                from: "Mini SIS Admin <buildwithkyle@kylepantig.site>",
                 to: email,
-                subject: "Invitation to Join SIS as Encoder",
+                subject: "Invitation to Join Mini SIS as Encoder",
                 html: `
-                    <h1>Welcome to SIS</h1>
+                    <h1>Welcome to Mini SIS</h1>
                     <p>You have been invited to join the Student Information System as an Grade Encoder.</p>
                     <p>Click the link below to verify your email and set your password:</p>
                     <a href="${inviteUrl}">Accept Invitation</a>
