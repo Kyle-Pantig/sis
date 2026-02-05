@@ -114,6 +114,10 @@ export default function CoursesPage() {
     const searchParams = useSearchParams();
     const queryClient = useQueryClient();
 
+    useEffect(() => {
+        setTitle("Course Management");
+    }, [setTitle]);
+
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
     const search = searchParams.get("search") || "";

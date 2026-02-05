@@ -119,10 +119,12 @@ export default function StudentProfilePage() {
     });
 
     useEffect(() => {
-        if (student) {
+        if (loading) {
+            setTitle("...");
+        } else if (student) {
             setTitle(`${student.firstName}'s Profile`);
         }
-    }, [student, setTitle]);
+    }, [student, loading, setTitle]);
 
     useEffect(() => {
         if (error) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { authApi } from "@/lib/api";
 import { IconSearch, IconChevronRight } from "@tabler/icons-react";
 import { usePathname } from "next/navigation";
@@ -14,6 +14,8 @@ import {
     BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import Link from "next/link";
+
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function DashboardHeader({ title }: { title: string }) {
     const [user, setUser] = useState<any>(null);
@@ -45,26 +47,51 @@ export function DashboardHeader({ title }: { title: string }) {
             <div className="flex-1 px-2">
                 <Breadcrumb>
                     <BreadcrumbList>
-                        {breadcrumbSegments.length > 0 && (
-                            <>
-                                <BreadcrumbItem>
-                                    <BreadcrumbLink asChild>
-                                        <Link href="/dashboard" className="font-medium text-zinc-500 hover:text-zinc-900 transition-colors">
-                                            Dashboard
-                                        </Link>
-                                    </BreadcrumbLink>
-                                </BreadcrumbItem>
-                                <BreadcrumbSeparator>
-                                    <IconChevronRight className="size-3.5 text-zinc-400" />
-                                </BreadcrumbSeparator>
-                            </>
-                        )}
-
                         <BreadcrumbItem>
-                            <BreadcrumbPage className="font-semibold text-zinc-900">
-                                {title}
-                            </BreadcrumbPage>
+                            {breadcrumbSegments.length === 0 ? (
+                                <BreadcrumbPage className="font-semibold text-zinc-900">
+                                    {title}
+                                </BreadcrumbPage>
+                            ) : (
+                                <BreadcrumbLink asChild>
+                                    <Link href="/dashboard" className="font-medium text-zinc-500 hover:text-zinc-900 transition-colors">
+                                        Dashboard
+                                    </Link>
+                                </BreadcrumbLink>
+                            )}
                         </BreadcrumbItem>
+
+                        {breadcrumbSegments.map((segment, index) => {
+                            const href = `/dashboard/${breadcrumbSegments.slice(0, index + 1).join("/")}`;
+                            const isLast = index === breadcrumbSegments.length - 1;
+
+                            const labelNode = isLast && title === "..." ? (
+                                <Skeleton className="h-4 w-20 bg-zinc-200" />
+                            ) : (
+                                isLast ? title : segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, " ")
+                            );
+
+                            return (
+                                <React.Fragment key={href}>
+                                    <BreadcrumbSeparator>
+                                        <IconChevronRight className="size-3.5 text-zinc-400" />
+                                    </BreadcrumbSeparator>
+                                    <BreadcrumbItem>
+                                        {isLast ? (
+                                            <BreadcrumbPage className="font-semibold text-zinc-900 flex items-center">
+                                                {labelNode}
+                                            </BreadcrumbPage>
+                                        ) : (
+                                            <BreadcrumbLink asChild>
+                                                <Link href={href} className="font-medium text-zinc-500 hover:text-zinc-900 transition-colors">
+                                                    {labelNode}
+                                                </Link>
+                                            </BreadcrumbLink>
+                                        )}
+                                    </BreadcrumbItem>
+                                </React.Fragment>
+                            );
+                        })}
                     </BreadcrumbList>
                 </Breadcrumb>
             </div>
