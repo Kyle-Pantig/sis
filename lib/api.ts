@@ -186,8 +186,8 @@ export const gradesApi = {
 };
 
 export const statsApi = {
-    getSummary: () => fetchApi("/api/stats"),
-    getCourseStats: () => fetchApi("/api/stats/courses"),
+    getSummary: () => fetchApi<{ students: number; courses: number; subjects: number; reservations: number }>("/api/stats"),
+    getCourseStats: () => fetchApi<Array<{ id: string; code: string; name: string; _count: { students: number } }>>("/api/stats/courses"),
 };
 
 export const usersApi = {

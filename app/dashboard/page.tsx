@@ -213,7 +213,7 @@ function CourseDistribution() {
     );
   }
 
-  const courses = data || [];
+  const courses = Array.isArray(data) ? data : [];
   const chartData = courses.map((c: any) => ({
     course: c.code,
     students: c._count?.students || 0,
