@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  role          String
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  grades        Grade[]   @relation("encoded_by")
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  entity    String
+  entityId  String   @map("entity_id")
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id])
+  details   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([entityId])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+model Course {
+  id            String    @id @default(uuid())
+  code          String    @unique
+  name          String
+  description   String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  students      Student[]
+  subjects      Subject[]
+  grades        Grade[]
+
+  @@map("courses")
+}
+
+model Student {
+  id                  String               @id @default(uuid())
+  studentNo           String               @unique @map("student_no")
+  firstName           String               @map("first_name")
+  lastName            String               @map("last_name")
+  email               String?              @unique
+  birthDate           DateTime             @map("birth_date")
+  courseId            String               @map("course_id")
+  course              Course               @relation(fields: [courseId], references: [id])
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  subjectReservations SubjectReservation[]
+  grades              Grade[]
+
+  @@index([courseId])
+  @@index([lastName, firstName])
+  @@map("students")
+}
+
+model Subject {
+  id                  String               @id @default(uuid())
+  courseId            String               @map("course_id")
+  course              Course               @relation(fields: [courseId], references: [id])
+  code                String
+  title               String
+  units               Int
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  subjectReservations SubjectReservation[]
+  grades              Grade[]
+
+  @@unique([courseId, code])
+  @@unique([courseId, title])
+  @@index([courseId])
+  @@map("subjects")
+}
+
+model SubjectReservation {
+  id         String   @id @default(uuid())
+  studentId  String   @map("student_id")
+  subjectId  String   @map("subject_id")
+  student    Student  @relation(fields: [studentId], references: [id])
+  subject    Subject  @relation(fields: [subjectId], references: [id])
+  reservedAt DateTime @default(now()) @map("reserved_at")
+  status     String   // reserved | cancelled
+
+  @@unique([studentId, subjectId])
+  @@index([studentId])
+  @@index([subjectId])
+  @@index([status])
+  @@map("subject_reservations")
+}
+
+model Grade {
+  id              String   @id @default(uuid())
+  studentId       String   @map("student_id")
+  subjectId       String   @map("subject_id")
+  courseId        String   @map("course_id")
+  student         Student  @relation(fields: [studentId], references: [id])
+  subject         Subject  @relation(fields: [subjectId], references: [id])
+  course          Course   @relation(fields: [courseId], references: [id])
+  prelim          Decimal?
+  midterm         Decimal?
+  finals          Decimal?
+  finalGrade      Decimal? @map("final_grade")
+  remarks         String?
+  encodedByUserId String   @map("encoded_by_user_id")
+  encoder         User     @relation("encoded_by", fields: [encodedByUserId], references: [id])
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([studentId, subjectId, courseId])
+  @@index([studentId])
+  @@index([subjectId])
+  @@index([courseId])
+  @@index([encodedByUserId])
+  @@map("grades")
+}
+
+model Invitation {
+  id        String   @id @default(uuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  role      String   @default("encoder")
+  verifiedAt DateTime? @map("verified_at")
+
+  @@index([email])
+  @@map("invitations")
+}
