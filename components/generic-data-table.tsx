@@ -72,7 +72,7 @@ export function GenericDataTable<TData, TValue>({
                                         )}
                                         onClick={header.column.getToggleSortingHandler()}
                                     >
-                                        <div className="flex items-center gap-2">
+                                        <div className={cn("flex items-center gap-2", (header.column.columnDef.meta as any)?.headerClassName)}>
                                             {header.isPlaceholder
                                                 ? null
                                                 : flexRender(

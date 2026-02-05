@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { gradesApi, subjectsApi, studentsApi } from "@/lib/api";
+import { gradesApi, subjectsApi, studentsApi, reservationsApi } from "@/lib/api";
 import { usePageTitle } from "../layout";
 import { CourseCombobox } from "@/components/course-combobox";
 import { GenericCombobox } from "@/components/generic-combobox";
@@ -172,6 +172,8 @@ export default function GradesPage() {
     });
 
     const formCourseId = form.watch("courseId");
+    const formStudentId = form.watch("studentId");
+    const formSubjectId = form.watch("subjectId");
     const formPrelim = form.watch("prelim");
     const formMidterm = form.watch("midterm");
     const formFinals = form.watch("finals");
@@ -181,6 +183,18 @@ export default function GradesPage() {
         queryKey: ["grades", page, limit, filterCourse, filterSubject, search],
         queryFn: () => gradesApi.getAll(page, limit, filterCourse || undefined, filterSubject || undefined, search || undefined),
         placeholderData: (previousData) => previousData,
+    });
+
+    const { data: existingGradesData, isLoading: loadingExistingGrades } = useQuery<Grade[]>({
+        queryKey: ["student-grades", formStudentId],
+        queryFn: () => gradesApi.getByStudent(formStudentId),
+        enabled: addOpen && !!formStudentId,
+    });
+
+    const { data: reservationsData, isLoading: loadingReservations } = useQuery<any[]>({
+        queryKey: ["student-reservations", formStudentId],
+        queryFn: () => reservationsApi.getByStudent(formStudentId),
+        enabled: addOpen && !!formStudentId,
     });
 
 
@@ -197,6 +211,39 @@ export default function GradesPage() {
         enabled: addOpen,
     });
 
+    // Auto-populate form when selecting an existing grade
+    React.useEffect(() => {
+        if (!formStudentId) return;
+
+        if (!formSubjectId) {
+            form.setValue("prelim", "");
+            form.setValue("midterm", "");
+            form.setValue("finals", "");
+            form.setValue("remarks", "");
+            return;
+        }
+
+        if (!Array.isArray(existingGradesData)) return;
+
+        const existingGrade = existingGradesData.find((g: Grade) => g.subjectId === formSubjectId);
+
+        if (existingGrade) {
+            // If it's a "Pending" grade, we treat it as new, so don't show "Pending" in remarks
+            const isPending = existingGrade.remarks === "Pending";
+
+            form.setValue("prelim", existingGrade.prelim ? Number(existingGrade.prelim) : "");
+            form.setValue("midterm", existingGrade.midterm ? Number(existingGrade.midterm) : "");
+            form.setValue("finals", existingGrade.finals ? Number(existingGrade.finals) : "");
+            form.setValue("remarks", isPending ? "" : (existingGrade.remarks || ""));
+        } else {
+            // Only clear if we really switched to a new subject
+            form.setValue("prelim", "");
+            form.setValue("midterm", "");
+            form.setValue("finals", "");
+            form.setValue("remarks", "");
+        }
+    }, [formSubjectId, existingGradesData, formStudentId, form]);
+
     const grades = data?.grades || [];
     const totalPages = data?.totalPages || 1;
     const total = data?.total || 0;
@@ -204,7 +251,52 @@ export default function GradesPage() {
     const students = studentsData?.students?.filter((s: Student) => !formCourseId || s.courseId === formCourseId) || [];
 
     // Filter subjects for dropdown based on selected course for new grade
-    const availableSubjects = subjects.filter((s) => !formCourseId || s.courseId === formCourseId);
+    // We treat "Pending" grades as if they haven't been graded yet (Add mode)
+    // Real existing grades are those that are NOT "Pending"
+
+    const reservedSubjectIds = Array.isArray(reservationsData) ? reservationsData.map((r: any) => r.subjectId) : [];
+
+    const selectedGrade = Array.isArray(existingGradesData)
+        ? existingGradesData.find((g: Grade) => g.subjectId === formSubjectId)
+        : null;
+
+    const isEditing = !!(selectedGrade && selectedGrade.remarks !== "Pending");
+
+    // Build subject options with disabled states
+    const subjectOptions = subjects
+        .filter((s) => !formCourseId || s.courseId === formCourseId)
+        .map((s) => {
+            const existingGrade = Array.isArray(existingGradesData)
+                ? existingGradesData.find((g: Grade) => g.subjectId === s.id)
+                : null;
+
+            const isFullyGraded = existingGrade && existingGrade.remarks !== "Pending";
+            const isPending = existingGrade && existingGrade.remarks === "Pending";
+            const isNotEnrolled = formStudentId && !reservedSubjectIds.includes(s.id);
+
+            let disabled = false;
+            let disabledReason = "";
+
+            if (isFullyGraded) {
+                // Allow selection for editing
+                disabled = false;
+                disabledReason = "Edit Grade"; // Indicates it has a grade
+            } else if (isNotEnrolled) {
+                disabled = true;
+                disabledReason = "Not enrolled";
+            } else if (isPending) {
+                // It's pending, so it's available for "Add Grade"
+                // We don't need a special label, or maybe distinct one?
+                // Letting it appear as a normal subject implies "Add".
+            }
+
+            return {
+                value: s.id,
+                label: `${s.code} - ${s.title}`,
+                disabled,
+                disabledReason,
+            };
+        });
 
     const clearDeepLinkMetadata = () => {
         const nextParams = new URLSearchParams(searchParams.toString());
@@ -244,7 +336,7 @@ export default function GradesPage() {
             return result;
         },
         onSuccess: () => {
-            toast.success("Grade created successfully");
+            toast.success("Grade saved successfully");
             queryClient.invalidateQueries({ queryKey: ["grades"] });
             setAddOpen(false);
             form.reset();
@@ -504,6 +596,7 @@ export default function GradesPage() {
             {
                 accessorKey: "prelim",
                 header: () => <div className="text-center">Prelim</div>,
+                meta: { headerClassName: "justify-center" },
                 cell: ({ row }) => {
                     const grade = row.original;
                     if (editingId === grade.id) {
@@ -543,6 +636,7 @@ export default function GradesPage() {
             {
                 accessorKey: "midterm",
                 header: () => <div className="text-center">Midterm</div>,
+                meta: { headerClassName: "justify-center" },
                 cell: ({ row }) => {
                     const grade = row.original;
                     if (editingId === grade.id) {
@@ -582,6 +676,7 @@ export default function GradesPage() {
             {
                 accessorKey: "finals",
                 header: () => <div className="text-center">Finals</div>,
+                meta: { headerClassName: "justify-center" },
                 cell: ({ row }) => {
                     const grade = row.original;
                     if (editingId === grade.id) {
@@ -621,6 +716,7 @@ export default function GradesPage() {
             {
                 accessorKey: "finalGrade",
                 header: () => <div className="text-center">Final Grade</div>,
+                meta: { headerClassName: "justify-center" },
                 cell: ({ row }) => {
                     const grade = row.original;
                     if (editingId === grade.id) {
@@ -651,7 +747,8 @@ export default function GradesPage() {
             },
             {
                 accessorKey: "remarks",
-                header: "Remarks",
+                header: () => <div className="text-center">Remarks</div>,
+                meta: { headerClassName: "justify-center" },
                 cell: ({ row }) => {
                     const grade = row.original;
                     let remarks = grade.remarks;
@@ -691,6 +788,7 @@ export default function GradesPage() {
             {
                 id: "actions",
                 header: () => <div className="text-right">Actions</div>,
+                meta: { headerClassName: "justify-end" },
                 cell: ({ row }) => {
                     const grade = row.original;
                     if (editingId === grade.id) {
@@ -971,10 +1069,10 @@ export default function GradesPage() {
                 setAddOpen(open);
                 if (!open) form.reset();
             }}>
-                <DialogContent className="sm:max-w-[500px]!">
+                <DialogContent className="sm:max-w-[500px]!" onOpenAutoFocus={(e) => e.preventDefault()}>
                     <DialogHeader>
-                        <DialogTitle className="text-xl font-bold">Add New Grade</DialogTitle>
-                        <DialogDescription>Enter grades for a student in a specific subject.</DialogDescription>
+                        <DialogTitle className="text-xl font-bold">{isEditing ? "Edit Grade" : "Add New Grade"}</DialogTitle>
+                        <DialogDescription>{isEditing ? "Update existing grades for the selected subject." : "Enter grades for a student in a specific subject."}</DialogDescription>
                     </DialogHeader>
 
                     <Form {...form}>
@@ -1011,7 +1109,10 @@ export default function GradesPage() {
                                         <FormControl>
                                             <GenericCombobox
                                                 value={field.value}
-                                                onValueChange={field.onChange}
+                                                onValueChange={(v) => {
+                                                    field.onChange(v);
+                                                    form.setValue("subjectId", "");
+                                                }}
                                                 items={students.map((s: Student) => ({
                                                     value: s.id,
                                                     label: `${s.studentNo} - ${s.lastName}, ${s.firstName}`,
@@ -1036,13 +1137,10 @@ export default function GradesPage() {
                                             <GenericCombobox
                                                 value={field.value}
                                                 onValueChange={field.onChange}
-                                                items={availableSubjects.map((s) => ({
-                                                    value: s.id,
-                                                    label: `${s.code} - ${s.title}`,
-                                                }))}
+                                                items={subjectOptions}
                                                 placeholder="Select subject"
                                                 className={!formCourseId ? "opacity-50 pointer-events-none w-full" : "w-full"}
-                                                isLoading={loadingSubjects}
+                                                isLoading={loadingSubjects || loadingReservations || loadingExistingGrades}
                                             />
                                         </FormControl>
                                         <FormMessage />
@@ -1160,10 +1258,10 @@ export default function GradesPage() {
                                     {isCreating ? (
                                         <>
                                             <IconLoader2 className="size-4 mr-2 animate-spin" />
-                                            Creating...
+                                            {isEditing ? "Updating..." : "Creating..."}
                                         </>
                                     ) : (
-                                        "Save Grade"
+                                        isEditing ? "Update Grade" : "Save Grade"
                                     )}
                                 </Button>
                             </DialogFooter>

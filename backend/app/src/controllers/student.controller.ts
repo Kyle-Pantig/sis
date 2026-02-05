@@ -60,6 +60,11 @@ export class StudentController {
                 return { error: "Student not found" };
             }
             if (error.code === 'P2002') {
+                const target = error.meta?.target;
+                if (target && target.includes('email')) {
+                    set.status = 400;
+                    return { error: "Email address already exists" };
+                }
                 set.status = 400;
                 return { error: "Student number already exists" };
             }

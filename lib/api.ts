@@ -1,6 +1,6 @@
 const API_URL = ""; // Empty string for relative path because we use Next.js rewrites
 
-export async function fetchApi(endpoint: string, options: RequestInit = {}) {
+export async function fetchApi(endpoint: string, options: RequestInit = {}, shouldThrow: boolean = true) {
     const response = await fetch(`${API_URL}${endpoint}`, {
         ...options,
         credentials: "include",
@@ -11,7 +11,7 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     });
     const data = await response.json();
 
-    if (!response.ok) {
+    if (!response.ok && shouldThrow) {
         throw new Error(data.error || "An error occurred");
     }
 
@@ -49,11 +49,11 @@ export const studentsApi = {
     create: (data: any) => fetchApi("/api/students", {
         method: "POST",
         body: JSON.stringify(data),
-    }),
+    }, false),
     update: (id: string, data: any) => fetchApi(`/api/students/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
-    }),
+    }, false),
     delete: (id: string) => fetchApi(`/api/students/${id}`, {
         method: "DELETE",
     }),

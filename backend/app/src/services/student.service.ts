@@ -131,7 +131,7 @@ export class StudentService {
             }
         }
 
-        const formattedSequence = nextSequence.toString().padStart(5, "0");
+        const formattedSequence = nextSequence.toString().padStart(4, "0");
         return `${yearPrefix}-${formattedSequence}`;
     }
 
@@ -254,7 +254,7 @@ export class StudentService {
             // Generate student number if not provided
             if (!studentNo) {
                 lastGeneratedSequence++;
-                const formattedSequence = lastGeneratedSequence.toString().padStart(5, "0");
+                const formattedSequence = lastGeneratedSequence.toString().padStart(4, "0");
                 studentNo = `${yearPrefix}-${formattedSequence}`;
             }
 

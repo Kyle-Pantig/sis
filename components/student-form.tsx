@@ -105,7 +105,7 @@ export function StudentForm({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[500px]" onOpenAutoFocus={(e) => e.preventDefault()}>
                 <DialogHeader>
                     <DialogTitle className="text-xl font-bold">
                         {mode === "create" ? "Add New Student" : "Edit Student"}

@@ -86,6 +86,7 @@ interface Student {
         code: string;
         name: string;
     } | null;
+    createdAt?: string | Date;
 }
 
 interface PaginatedStudents {
@@ -132,15 +133,18 @@ export default function StudentsPage() {
         mutationFn: async ({ mode, data, id }: { mode: "create" | "edit", data: StudentFormValues, id?: string }) => {
             if (mode === "create") {
                 const result = await studentsApi.create(data);
-                if (result.error) throw new Error(result.error);
                 return result;
             } else {
                 const result = await studentsApi.update(id!, data);
-                if (result.error) throw new Error(result.error);
                 return result;
             }
         },
         onSuccess: (data, variables) => {
+            if (data?.error) {
+                toast.error(data.error);
+                return;
+            }
+
             toast.success(`Student ${variables.mode === "create" ? "created" : "updated"} successfully`);
             queryClient.invalidateQueries({ queryKey: ["students"] });
             // Also invalidate dashboard stats (for new students or course changes)
@@ -387,6 +391,7 @@ export default function StudentsPage() {
                 header: "Email Address",
                 cell: ({ row }) => {
                     const student = row.original;
+                    // ... (keep existing email cell logic)
                     return (
                         <div className="text-sm text-zinc-500 font-medium">
                             {editingId === student.id ? (
@@ -424,8 +429,25 @@ export default function StudentsPage() {
                 },
             },
             {
+                accessorKey: "createdAt",
+                header: "Enrollment Date",
+                cell: ({ row }) => {
+                    const date = row.original.createdAt ? new Date(row.original.createdAt) : null;
+                    return (
+                        <span className="text-sm text-zinc-500 font-medium">
+                            {date ? date.toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                            }) : "—"}
+                        </span>
+                    );
+                },
+            },
+            {
                 id: "actions",
                 header: () => <div className="text-right">Actions</div>,
+                meta: { headerClassName: "justify-end" },
                 cell: ({ row }) => {
                     const student = row.original;
                     return (

@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { faker } from "@faker-js/faker";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -18,13 +19,17 @@ function getRemarks(grade: number): string {
 async function main() {
     console.log("Seeding started...");
 
+    const passwordParams = (await bcrypt.hash("admin1234", 10));
+
     // 1. Create a default admin user
     const admin = await prisma.user.upsert({
         where: { email: "admin@sis.com" },
-        update: {},
+        update: {
+            passwordHash: await bcrypt.hash("admin1234", 10),
+        },
         create: {
             email: "admin@sis.com",
-            passwordHash: "admin123", // In a real app, use bcrypt/argon2
+            passwordHash: await bcrypt.hash("admin1234", 10), // In a real app, use bcrypt/argon2
             role: "admin",
         },
     });
@@ -33,10 +38,12 @@ async function main() {
     // 1.1 Create a default encoder user
     const encoder = await prisma.user.upsert({
         where: { email: "encoder@sis.com" },
-        update: {},
+        update: {
+            passwordHash: await bcrypt.hash("encoder123", 10),
+        },
         create: {
             email: "encoder@sis.com",
-            passwordHash: "encoder123",
+            passwordHash: await bcrypt.hash("encoder123", 10),
             role: "encoder",
         },
     });
@@ -115,7 +122,8 @@ async function main() {
         });
 
         for (const student of allStudents) {
-            // Get subjects for students course
+            if (!student.courseId) continue;
+            // Get subjects for student's course
             const subjects = await prisma.subject.findMany({
                 where: { courseId: student.courseId },
             });
@@ -158,6 +166,8 @@ async function main() {
             // Weighted: 30% Prelim, 30% Midterm, 40% Finals
             const finalGrade = Math.round(((prelim * 0.3) + (midterm * 0.3) + (finals * 0.4)) * 100) / 100;
             const remarks = getRemarks(finalGrade);
+
+            if (!reservation.student.courseId) continue;
 
             await prisma.grade.upsert({
                 where: {

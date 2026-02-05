@@ -392,6 +392,7 @@ export default function CoursesPage() {
                             Students
                         </div>
                     ),
+                    meta: { headerClassName: "justify-center" },
                     cell: ({ row }) => (
                         <div className="text-center font-bold text-zinc-900">
                             {row.original._count.students}
@@ -406,6 +407,7 @@ export default function CoursesPage() {
                             Subjects
                         </div>
                     ),
+                    meta: { headerClassName: "justify-center" },
                     cell: ({ row }) => (
                         <div className="text-center font-bold text-zinc-900">
                             {row.original._count.subjects}
@@ -415,6 +417,7 @@ export default function CoursesPage() {
                 {
                     id: "actions",
                     header: () => <div className="text-right">Actions</div>,
+                    meta: { headerClassName: "justify-end" },
                     cell: ({ row }) => {
                         const course = row.original;
                         return (
@@ -690,7 +693,7 @@ export default function CoursesPage() {
 
             {/* Create/Edit Dialog with React Hook Form */}
             <Dialog open={formOpen} onOpenChange={setFormOpen}>
-                <DialogContent className="sm:max-w-[500px]">
+                <DialogContent className="sm:max-w-[500px]" onOpenAutoFocus={(e) => e.preventDefault()}>
                     <DialogHeader>
                         <DialogTitle className="text-xl font-bold">
                             {formMode === "create" ? "Add New Course" : "Edit Course"}

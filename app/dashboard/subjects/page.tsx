@@ -393,11 +393,13 @@ export default function SubjectsPage() {
                 {
                     accessorKey: "units",
                     header: "Units",
+                    meta: { headerClassName: "justify-center" },
                     cell: ({ row }) => <span className="font-bold">{row.original.units}</span>,
                 },
                 {
                     id: "actions",
                     header: () => <div className="text-right">Actions</div>,
+                    meta: { headerClassName: "justify-end" },
                     cell: ({ row }) => {
                         const subject = row.original;
                         return (
@@ -691,7 +693,7 @@ export default function SubjectsPage() {
 
             {/* Create/Edit Dialog */}
             <Dialog open={formOpen} onOpenChange={setFormOpen}>
-                <DialogContent className="sm:max-w-[500px]">
+                <DialogContent className="sm:max-w-[500px]" onOpenAutoFocus={(e) => e.preventDefault()}>
                     <DialogHeader>
                         <DialogTitle className="text-xl font-bold">
                             {formMode === "create" ? "Add New Subject" : "Edit Subject"}

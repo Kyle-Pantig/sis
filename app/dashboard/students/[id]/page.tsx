@@ -50,9 +50,12 @@ import {
     IconExternalLink,
     IconTrash,
     IconCopy,
+    IconPencil,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { Check, Search, X } from "lucide-react";
+import { StudentForm } from "@/components/student-form";
+import { type StudentFormValues } from "@/lib/validations/student";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // ... existing interfaces ...
@@ -101,6 +104,7 @@ export default function StudentProfilePage() {
     const params = useParams();
     const router = useRouter();
     const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [manageSearch, setManageSearch] = useState("");
     const [copied, setCopied] = useState(false);
     const queryClient = useQueryClient();
@@ -176,6 +180,23 @@ export default function StudentProfilePage() {
         },
         onError: (error: any) => {
             toast.error(error.message || "Failed to unreserve records");
+        },
+    });
+
+    const updateStudentMutation = useMutation({
+        mutationFn: (data: StudentFormValues) =>
+            studentsApi.update(params.id as string, data),
+        onSuccess: (data) => {
+            if (data.error) {
+                toast.error(data.error);
+                return;
+            }
+            queryClient.invalidateQueries({ queryKey: ["student", params.id] });
+            toast.success("Student profile updated successfully");
+            setIsEditModalOpen(false);
+        },
+        onError: (error: any) => {
+            toast.error(error.message || "Failed to update profile");
         },
     });
 
@@ -349,6 +370,19 @@ export default function StudentProfilePage() {
         return a.subject.code.localeCompare(b.subject.code);
     });
 
+    const visibleSubjects = courseSubjects?.filter((s: any) =>
+        s.code.toLowerCase().includes(manageSearch.toLowerCase()) ||
+        s.title.toLowerCase().includes(manageSearch.toLowerCase())
+    ) || [];
+
+    const hasReservableSubjects = visibleSubjects.some((s: any) =>
+        !student?.subjectReservations.some(r => r.subject.id === s.id)
+    );
+
+    const hasUnreservableSubjects = visibleSubjects.some((s: any) =>
+        student?.subjectReservations.some(r => r.subject.id === s.id)
+    );
+
     return (
         <div className="space-y-6 max-w-full">
             {/* 1. Header Section */}
@@ -381,13 +415,22 @@ export default function StudentProfilePage() {
                 <div className="space-y-6 xl:col-span-1">
 
                     {/* Student ID Card */}
-                    <Card className="border border-zinc-200 shadow-sm overflow-hidden">
+                    <Card className="border border-zinc-200 shadow-sm overflow-hidden py-0">
                         <div className="h-24 bg-gradient-to-br from-blue-600 to-indigo-700 relative">
                             <div className="absolute -bottom-10 left-6 p-1 bg-white rounded-full">
                                 <div className="size-20 rounded-full bg-zinc-100 flex items-center justify-center border border-zinc-200 shadow-inner">
                                     <IconUser className="size-10 text-zinc-300" />
                                 </div>
                             </div>
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                className="absolute top-4 right-4 text-white hover:bg-white/20 hover:text-white"
+                                onClick={() => setIsEditModalOpen(true)}
+                                title="Edit Profile"
+                            >
+                                <IconPencil className="size-5" />
+                            </Button>
                         </div>
                         <CardContent className="pt-12 pb-6 px-6">
                             <div className="grid gap-4 mt-2">
@@ -507,7 +550,7 @@ export default function StudentProfilePage() {
 
                 {/* Right Column: Grades Table */}
                 <div className="xl:col-span-2 space-y-6">
-                    <Card className="border border-zinc-200 shadow-sm h-full flex flex-col">
+                    <Card className="border border-zinc-200 shadow-sm h-full flex flex-col py-0">
                         <CardHeader className="border-b border-zinc-100 bg-zinc-50/30 py-4">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div className="space-y-1">
@@ -538,14 +581,14 @@ export default function StudentProfilePage() {
                                         <TableHead className="w-[10%] min-w-[80px] border-b border-zinc-200 font-bold text-xs uppercase tracking-widest text-zinc-500 text-center py-4">Midterm</TableHead>
                                         <TableHead className="w-[10%] min-w-[80px] border-b border-zinc-200 font-bold text-xs uppercase tracking-widest text-zinc-500 text-center py-4">Finals</TableHead>
                                         <TableHead className="w-[10%] min-w-[80px] border-b border-zinc-200 font-bold text-xs uppercase tracking-widest text-zinc-500 text-center py-4 bg-zinc-50/50">Final Grade</TableHead>
-                                        <TableHead className="w-[12%] min-w-[100px] border-b border-zinc-200 font-bold text-xs uppercase tracking-widest text-zinc-500 text-center py-4">Assessment</TableHead>
+                                        <TableHead className="w-[12%] min-w-[100px] border-b border-zinc-200 font-bold text-xs uppercase tracking-widest text-zinc-500 text-center py-4">Remarks</TableHead>
                                         <TableHead className="w-[20%] min-w-[140px] border-b border-zinc-200 font-bold text-xs uppercase tracking-widest text-zinc-500 text-center pr-6 py-4">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {allRecords.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={7} className="h-48 text-center">
+                                            <TableCell colSpan={8} className="h-48 text-center">
                                                 <div className="flex flex-col items-center justify-center gap-2">
                                                     <div className="size-10 rounded-full bg-zinc-100 flex items-center justify-center">
                                                         <IconBook className="size-5 text-zinc-300" />
@@ -711,10 +754,19 @@ export default function StudentProfilePage() {
                                         toast.info("No new subjects to reserve in this view");
                                     }
                                 }}
-                                disabled={bulkReserveMutation.isPending || bulkUnreserveMutation.isPending || loadingSubjects}
+                                disabled={bulkReserveMutation.isPending || bulkUnreserveMutation.isPending || loadingSubjects || !hasReservableSubjects}
                             >
-                                <IconPlus className="size-3.5 text-blue-600" />
-                                Reserve All {manageSearch ? "Visible" : ""}
+                                {bulkReserveMutation.isPending ? (
+                                    <>
+                                        <IconLoader2 className="size-3.5 animate-spin" />
+                                        Processing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <IconPlus className="size-3.5 text-blue-600" />
+                                        Reserve All {manageSearch ? "Visible" : ""}
+                                    </>
+                                )}
                             </Button>
                             <Button
                                 variant="outline"
@@ -734,10 +786,19 @@ export default function StudentProfilePage() {
                                         toast.info("No reserved subjects to unreserve in this view");
                                     }
                                 }}
-                                disabled={bulkReserveMutation.isPending || bulkUnreserveMutation.isPending || loadingSubjects}
+                                disabled={bulkReserveMutation.isPending || bulkUnreserveMutation.isPending || loadingSubjects || !hasUnreservableSubjects}
                             >
-                                <IconTrash className="size-3.5" />
-                                Unreserve All {manageSearch ? "Visible" : ""}
+                                {bulkUnreserveMutation.isPending ? (
+                                    <>
+                                        <IconLoader2 className="size-3.5 animate-spin" />
+                                        Processing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <IconTrash className="size-3.5" />
+                                        Unreserve All {manageSearch ? "Visible" : ""}
+                                    </>
+                                )}
                             </Button>
                         </div>
                     </div>
@@ -848,6 +909,29 @@ export default function StudentProfilePage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+
+            {
+                student && (
+                    <StudentForm
+                        open={isEditModalOpen}
+                        onOpenChange={setIsEditModalOpen}
+                        mode="edit"
+                        defaultValues={{
+                            studentNo: student.studentNo,
+                            firstName: student.firstName,
+                            lastName: student.lastName,
+                            email: student.email || "",
+                            birthDate: student.birthDate,
+                            courseId: student.course.id,
+                        }}
+                        onSubmit={async (data) => {
+                            await updateStudentMutation.mutateAsync(data);
+                        }}
+                        isSubmitting={updateStudentMutation.isPending}
+                    />
+                )
+            }
         </div >
     );
 }
