@@ -244,6 +244,7 @@ function SecurityTab() {
                             <Input
                                 id="current"
                                 type={showPassword ? "text" : "password"}
+                                autoComplete="off"
                                 value={passwords.current}
                                 onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
                                 placeholder="••••••••"
@@ -257,6 +258,7 @@ function SecurityTab() {
                             <Input
                                 id="new"
                                 type={showPassword ? "text" : "password"}
+                                autoComplete="off"
                                 value={passwords.new}
                                 onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
                                 placeholder="••••••••"
@@ -269,6 +271,7 @@ function SecurityTab() {
                             <Input
                                 id="confirm"
                                 type={showPassword ? "text" : "password"}
+                                autoComplete="off"
                                 value={passwords.confirm}
                                 onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
                                 placeholder="••••••••"

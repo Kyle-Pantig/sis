@@ -31,7 +31,6 @@ const data = {
   user: {
     name: "Admin User",
     email: "admin@sis.com",
-    avatar: "/avatars/admin.jpg",
   },
   navMain: [
     {
@@ -101,7 +100,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const userData = {
     name: user?.role === 'admin' ? "Admin User" : "Encoder User",
     email: user?.email || "user@sis.com",
-    avatar: user?.role === 'admin' ? "/avatars/admin.jpg" : "/avatars/encoder.jpg",
   };
 
   return (
