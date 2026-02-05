@@ -520,7 +520,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between mb-4 relative z-10">
           <div className="flex items-center gap-2">
             <IconUsers className="size-5 text-indigo-600 group-hover/bento:text-white transition-colors" />
-            <h3 className="font-bold text-zinc-900 group-hover/bento:text-white transition-colors">Recent</h3>
+            <h3 className="font-bold text-zinc-900 group-hover/bento:text-white transition-colors">Recent Students</h3>
           </div>
         </div>
         <div className="flex-1 overflow-auto relative z-10">
