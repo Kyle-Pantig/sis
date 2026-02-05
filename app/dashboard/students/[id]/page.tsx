@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import {
     Card,
     CardContent,
-    CardDescription,
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
@@ -53,51 +52,12 @@ import {
     IconPencil,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { Check, Search, X } from "lucide-react";
-import { StudentForm } from "@/components/student-form";
+import { Check } from "lucide-react";
+import { StudentForm } from "@/components/forms/student-form";
 import { type StudentFormValues } from "@/lib/validations/student";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// ... existing interfaces ...
-interface Subject {
-    id: string;
-    code: string;
-    title: string;
-    units: number;
-}
-
-interface Reservation {
-    id: string;
-    status: string;
-    reservedAt: string;
-    subject: Subject;
-}
-
-interface Grade {
-    id: string;
-    prelim: number | null;
-    midterm: number | null;
-    finals: number | null;
-    finalGrade: number | null;
-    remarks: string | null;
-    subject: Subject;
-}
-
-interface StudentProfile {
-    id: string;
-    studentNo: string;
-    firstName: string;
-    lastName: string;
-    email: string | null;
-    birthDate: string;
-    course: {
-        id: string;
-        code: string;
-        name: string;
-    };
-    subjectReservations: Reservation[];
-    grades: Grade[];
-}
+import { StudentProfile } from "@/types";
 
 export default function StudentProfilePage() {
     const { setTitle } = usePageTitle();
@@ -622,25 +582,25 @@ export default function StudentProfilePage() {
 
                                                 {/* Grade Columns */}
                                                 <TableCell className="text-center py-4 text-sm font-medium text-zinc-600 align-middle">
-                                                    {grade?.prelim ? Number(grade.prelim).toFixed(2) : <span className="text-zinc-300">—</span>}
+                                                    {grade?.prelim !== null && grade?.prelim !== undefined ? grade.prelim.toFixed(2) : <span className="text-zinc-300">—</span>}
                                                 </TableCell>
                                                 <TableCell className="text-center py-4 text-sm font-medium text-zinc-600 align-middle">
-                                                    {grade?.midterm ? Number(grade.midterm).toFixed(2) : <span className="text-zinc-300">—</span>}
+                                                    {grade?.midterm !== null && grade?.midterm !== undefined ? grade.midterm.toFixed(2) : <span className="text-zinc-300">—</span>}
                                                 </TableCell>
                                                 <TableCell className="text-center py-4 text-sm font-medium text-zinc-600 align-middle">
-                                                    {grade?.finals ? Number(grade.finals).toFixed(2) : <span className="text-zinc-300">—</span>}
+                                                    {grade?.finals !== null && grade?.finals !== undefined ? grade.finals.toFixed(2) : <span className="text-zinc-300">—</span>}
                                                 </TableCell>
 
                                                 {/* Final Grade Highlight */}
                                                 <TableCell className={cn(
                                                     "text-center py-4 text-sm align-middle transition-colors font-bold",
-                                                    grade?.finalGrade ? (
-                                                        Number(grade.finalGrade) <= 3.0
+                                                    grade?.finalGrade !== null && grade?.finalGrade !== undefined ? (
+                                                        grade.finalGrade <= 3.0
                                                             ? "bg-emerald-50 text-emerald-700"
                                                             : "bg-red-50 text-red-700"
                                                     ) : "text-zinc-400 bg-zinc-50/30 font-medium"
                                                 )}>
-                                                    {grade?.finalGrade ? Number(grade.finalGrade).toFixed(2) : "—"}
+                                                    {grade?.finalGrade !== null && grade?.finalGrade !== undefined ? grade.finalGrade.toFixed(2) : "—"}
                                                 </TableCell>
 
                                                 {/* Remarks Badge */}

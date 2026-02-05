@@ -30,40 +30,15 @@ import {
 } from "@/components/ui/form";
 import { IconLoader2 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { Student, Subject, Grade } from "@/types";
 
 interface GradeFormProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSubmit: (data: any) => Promise<void>; // Accepts combined data
+    onSubmit: (data: any) => Promise<void>;
     defaultValues?: Partial<GradeFormValues>;
-    mode?: "create" | "edit"; // Usually "create" since edit is often inline, but this supports dialog editing
+    mode?: "create" | "edit";
     isSubmitting?: boolean;
-}
-
-interface Student {
-    id: string;
-    studentNo: string;
-    firstName: string;
-    lastName: string;
-    courseId: string;
-}
-
-interface Subject {
-    id: string;
-    code: string;
-    title: string;
-    courseId: string;
-}
-
-interface Grade {
-    id: string;
-    studentId: string;
-    subjectId: string;
-    prelim: string | null;
-    midterm: string | null;
-    finals: string | null;
-    remarks: string | null;
 }
 
 export function GradeForm({
@@ -143,9 +118,9 @@ export function GradeForm({
             // If it's a "Pending" grade, we treat it as new, so don't show "Pending" in remarks
             const isPending = existingGrade.remarks === "Pending";
 
-            form.setValue("prelim", existingGrade.prelim ? Number(existingGrade.prelim) : "");
-            form.setValue("midterm", existingGrade.midterm ? Number(existingGrade.midterm) : "");
-            form.setValue("finals", existingGrade.finals ? Number(existingGrade.finals) : "");
+            form.setValue("prelim", existingGrade.prelim ?? "");
+            form.setValue("midterm", existingGrade.midterm ?? "");
+            form.setValue("finals", existingGrade.finals ?? "");
             form.setValue("remarks", isPending ? "" : (existingGrade.remarks || ""));
         } else {
             // Only clear if we really switched to a new subject
@@ -383,9 +358,9 @@ export function GradeForm({
                             <Label>Remarks</Label>
                             <div className="h-10 flex items-center">
                                 {(() => {
-                                    const p = parseFloat((formPrelim as string) || "0");
-                                    const m = parseFloat((formMidterm as string) || "0");
-                                    const f = parseFloat((formFinals as string) || "0");
+                                    const p = parseFloat(String(formPrelim || "0"));
+                                    const m = parseFloat(String(formMidterm || "0"));
+                                    const f = parseFloat(String(formFinals || "0"));
                                     if (!formPrelim || !formMidterm || !formFinals) {
                                         return (
                                             <Badge

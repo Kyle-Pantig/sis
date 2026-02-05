@@ -95,15 +95,26 @@ export function DashboardHeader({ title }: { title: string }) {
                     </BreadcrumbList>
                 </Breadcrumb>
             </div>
-            <div className="hidden md:flex items-center gap-6 pr-4">
+            <div className="flex items-center gap-1 md:gap-4 pr-2">
+                {/* Mobile Search Icon */}
                 <button
                     onClick={() => window.dispatchEvent(new CustomEvent('open-global-search'))}
-                    className="flex items-center gap-2 px-3 py-1.5 text-zinc-400 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors mr-2 shadow-sm"
+                    className="md:hidden flex h-9 w-9 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 transition-colors"
                 >
                     <IconSearch className="size-4" />
-                    <span className="text-xs">Search everything...</span>
-                    <kbd className="ml-2 px-1.5 py-0.5 text-[10px] font-mono bg-zinc-100 border border-zinc-200 rounded-md">Ctrl K</kbd>
                 </button>
+
+                {/* Desktop Search Button */}
+                <div className="hidden md:flex items-center gap-6">
+                    <button
+                        onClick={() => window.dispatchEvent(new CustomEvent('open-global-search'))}
+                        className="flex items-center gap-2 px-3 py-1.5 text-zinc-400 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors mr-2 shadow-sm"
+                    >
+                        <IconSearch className="size-4" />
+                        <span className="text-xs">Search everything...</span>
+                        <kbd className="ml-2 px-1.5 py-0.5 text-[10px] font-mono bg-zinc-100 border border-zinc-200 rounded-md">Ctrl K</kbd>
+                    </button>
+                </div>
             </div>
         </header>
     );

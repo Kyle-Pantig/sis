@@ -4,31 +4,15 @@ import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { gradesApi, subjectsApi, studentsApi, reservationsApi } from "@/lib/api";
+import { gradesApi, subjectsApi } from "@/lib/api";
 import { usePageTitle } from "../layout";
 import { CourseCombobox } from "@/components/course-combobox";
 import { GenericCombobox } from "@/components/generic-combobox";
 import { toast } from "sonner";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
 import {
     Select,
     SelectContent,
@@ -46,79 +30,18 @@ import {
     PaginationPrevious,
 } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Label } from "@/components/ui/label";
-import { IconPlus, IconSearch, IconLoader2, IconPencil, IconCheck, IconX, IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
+import { IconPlus, IconSearch, IconLoader2, IconPencil, IconCheck, IconX } from "@tabler/icons-react";
 import {
     ColumnDef,
-    flexRender,
-    getCoreRowModel,
-    getSortedRowModel,
     SortingState,
-    useReactTable,
 } from "@tanstack/react-table";
-
 import { type GradeFormValues } from "@/lib/validations/grade";
 import { ListFilter, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GenericDataTable } from "@/components/generic-data-table";
-import { GradeForm } from "@/components/grade-form";
+import { GradeForm } from "@/components/forms/grade-form";
 
-interface Grade {
-    id: string;
-    studentId: string;
-    subjectId: string;
-    courseId: string;
-    prelim: string | null;
-    midterm: string | null;
-    finals: string | null;
-    finalGrade: string | null;
-    remarks: string | null;
-    student: {
-        id: string;
-        studentNo: string;
-        firstName: string;
-        lastName: string;
-    };
-    subject: {
-        id: string;
-        code: string;
-        title: string;
-    };
-    course: {
-        id: string;
-        code: string;
-        name: string;
-    };
-}
-
-interface PaginatedGrades {
-    grades: Grade[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-}
-
-
-
-interface Subject {
-    id: string;
-    code: string;
-    title: string;
-    courseId: string;
-    course: {
-        code: string;
-        name: string;
-    };
-}
-
-interface Student {
-    id: string;
-    studentNo: string;
-    firstName: string;
-    lastName: string;
-    courseId: string;
-}
+import { Grade, PaginatedGrades, Subject } from "@/types";
 
 export default function GradesPage() {
     const { setTitle } = usePageTitle();
@@ -288,9 +211,9 @@ export default function GradesPage() {
     function startEdit(grade: Grade) {
         setEditingId(grade.id);
         setEditValues({
-            prelim: grade.prelim || "",
-            midterm: grade.midterm || "",
-            finals: grade.finals || "",
+            prelim: grade.prelim !== null ? String(grade.prelim) : "",
+            midterm: grade.midterm !== null ? String(grade.midterm) : "",
+            finals: grade.finals !== null ? String(grade.finals) : "",
             remarks: grade.remarks || "",
         });
     }
@@ -337,9 +260,9 @@ export default function GradesPage() {
                 const grade = grades.find(g => g.id === editingId);
                 if (grade) {
                     const hasChanges =
-                        (editValues.prelim || "") !== (grade.prelim || "") ||
-                        (editValues.midterm || "") !== (grade.midterm || "") ||
-                        (editValues.finals || "") !== (grade.finals || "");
+                        editValues.prelim !== (grade.prelim !== null ? String(grade.prelim) : "") ||
+                        editValues.midterm !== (grade.midterm !== null ? String(grade.midterm) : "") ||
+                        editValues.finals !== (grade.finals !== null ? String(grade.finals) : "");
                     if (hasChanges) {
                         e.preventDefault();
                         saveEdit(grade.id);
@@ -403,9 +326,6 @@ export default function GradesPage() {
         const params = new URLSearchParams(searchParams.toString());
         if (courseIds.length > 0) {
             params.set("courseId", courseIds.join(","));
-            // Clear subject filter if multiple courses are selected or course changes, 
-            // as subjects are usually specific to a single course context in the filter dropdown logic?
-            // Actually, we might want to keep it if valid, but simplest is to reset subject filter on course change.
             params.delete("subjectId");
         } else {
             params.delete("courseId");
@@ -442,20 +362,22 @@ export default function GradesPage() {
         router.push("/dashboard/grades");
     }
 
-    function getGradeColor(grade: string | null): string {
-        if (!grade) return "text-zinc-400";
-        const num = parseFloat(grade);
-        if (num > 3.0) return "text-red-600 font-medium";
+    function getGradeColor(grade: number | null): string {
+        if (grade === null || grade === undefined) return "text-zinc-400";
+        const numGrade = typeof grade === 'string' ? parseFloat(grade) : grade;
+        if (isNaN(numGrade)) return "text-zinc-400";
+        if (numGrade > 3.0) return "text-red-600 font-medium";
         return "text-zinc-900 font-medium";
     }
 
-    function formatGrade(grade: string | null): string {
-        if (!grade) return "-";
-        return parseFloat(grade).toFixed(2);
+    function formatGrade(grade: number | null): string {
+        if (grade === null || grade === undefined) return "-";
+        const numGrade = typeof grade === 'string' ? parseFloat(grade) : grade;
+        if (isNaN(numGrade)) return "-";
+        return numGrade.toFixed(2);
     }
 
     const isUpdating = updateMutation.isPending;
-    const isCreating = createMutation.isPending;
 
     const columns = React.useMemo<ColumnDef<Grade>[]>(
         () => [
@@ -501,9 +423,9 @@ export default function GradesPage() {
                                             e.preventDefault();
                                             e.stopPropagation();
                                             const hasChanges =
-                                                (editValues.prelim || "") !== (grade.prelim || "") ||
-                                                (editValues.midterm || "") !== (grade.midterm || "") ||
-                                                (editValues.finals || "") !== (grade.finals || "");
+                                                editValues.prelim !== (grade.prelim !== null ? String(grade.prelim) : "") ||
+                                                editValues.midterm !== (grade.midterm !== null ? String(grade.midterm) : "") ||
+                                                editValues.finals !== (grade.finals !== null ? String(grade.finals) : "");
                                             if (hasChanges) saveEdit(grade.id);
                                         }
                                     }}
@@ -620,7 +542,7 @@ export default function GradesPage() {
                     return (
                         <div className={cn(
                             "text-center py-1 font-bold transition-colors",
-                            grade.finalGrade ? (parseFloat(grade.finalGrade) <= 3.0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700") : "text-zinc-400 bg-zinc-50/30"
+                            grade.finalGrade !== null && grade.finalGrade !== undefined ? (grade.finalGrade <= 3.0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700") : "text-zinc-400 bg-zinc-50/30"
                         )}>
                             {formatGrade(grade.finalGrade)}
                         </div>
@@ -757,7 +679,7 @@ export default function GradesPage() {
 
     return (
         <div className="space-y-6">
-            <Card className="border-none shadow-sm">
+            <Card className="border-none shadow-sm gap-2">
                 <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <CardTitle className="text-xl">Digital Grading Sheet</CardTitle>
@@ -765,13 +687,14 @@ export default function GradesPage() {
                             Total records: <span className="font-bold text-zinc-900">{total}</span>
                         </CardDescription>
                     </div>
-                    <Button onClick={() => setAddOpen(true)} className="gap-2">
-                        <IconPlus className="size-4" />
-                        Add Grade
-                    </Button>
+                    <div className="flex items-center gap-2 w-full md:w-auto">
+                        <Button onClick={() => setAddOpen(true)} className="gap-2 flex-1 md:flex-none">
+                            <IconPlus className="size-4" />
+                            Add Grade
+                        </Button>
+                    </div>
                 </CardHeader>
 
-                {/* Filters */}
                 {/* Search and Filters */}
                 <div className="px-6 pb-6 flex flex-col lg:flex-row gap-4 items-start lg:items-center">
                     {/* Search Group */}

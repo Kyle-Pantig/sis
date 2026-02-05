@@ -76,14 +76,17 @@ export function ConfirmDialog({
             <AlertDialogFooter>
                 <AlertDialogCancel disabled={isLoading}>{cancelText}</AlertDialogCancel>
                 <AlertDialogAction
-                    onClick={(e) => onConfirm(e)}
+                    onClick={(e) => {
+                        e.preventDefault();
+                        onConfirm(e);
+                    }}
                     disabled={isLoading || disabled}
                     className={cn(
                         variant === "destructive" && "bg-red-600 hover:bg-red-700 focus-visible:ring-red-600"
                     )}
                 >
                     {isLoading && <IconLoader2 className="size-4 mr-2 animate-spin" />}
-                    {confirmText}
+                    {isLoading ? "Deleting..." : confirmText}
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>

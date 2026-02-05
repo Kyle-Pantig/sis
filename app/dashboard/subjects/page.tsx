@@ -7,14 +7,6 @@ import { useSearchParams } from "next/navigation";
 import { subjectsApi } from "@/lib/api";
 import { usePageTitle } from "../layout";
 import { toast } from "sonner";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,45 +39,17 @@ import {
 } from "@/components/ui/pagination";
 import { type SubjectFormValues } from "@/lib/validations/subject";
 import { Skeleton } from "@/components/ui/skeleton";
-import { IconPlus, IconDotsVertical, IconPencil, IconTrash, IconSearch, IconLoader2, IconX, IconChevronUp, IconChevronDown, IconSelector, IconExclamationCircle } from "@tabler/icons-react";
+import { IconPlus, IconDotsVertical, IconPencil, IconTrash, IconSearch, IconLoader2, IconX, IconExclamationCircle } from "@tabler/icons-react";
 import {
     ColumnDef,
-    flexRender,
-    getCoreRowModel,
-    getSortedRowModel,
     SortingState,
-    useReactTable,
 } from "@tanstack/react-table";
-import { cn } from "@/lib/utils";
 import { GenericDataTable } from "@/components/generic-data-table";
-import { SubjectForm } from "@/components/subject-form";
+import { SubjectForm } from "@/components/forms/subject-form";
 import { useAuth } from "@/context/auth-context";
 import { CourseCombobox } from "@/components/course-combobox";
 
-interface Subject {
-    id: string;
-    code: string;
-    title: string;
-    units: number;
-    courseId: string;
-    course: {
-        id: string;
-        code: string;
-        name: string;
-    };
-    _count: {
-        subjectReservations: number;
-        grades: number;
-    };
-}
-
-interface PaginatedSubjects {
-    subjects: Subject[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-}
+import { Subject, PaginatedSubjects } from "@/types";
 
 
 export default function SubjectsPage() {
@@ -110,8 +74,6 @@ export default function SubjectsPage() {
         queryFn: () => subjectsApi.getAll(page, limit, search || undefined, filterCourse || undefined),
         placeholderData: (previousData) => previousData,
     });
-
-
 
     const subjects = data?.subjects || [];
     const totalPages = data?.totalPages || 1;
@@ -191,8 +153,8 @@ export default function SubjectsPage() {
 
     const selectionSummary = React.useMemo(() => {
         const selectedSubjects = subjects.filter(s => selectedIds.includes(s.id));
-        const withStudents = selectedSubjects.filter(s => (s._count.subjectReservations || 0) > 0 || (s._count.grades || 0) > 0);
-        const deletable = selectedSubjects.filter(s => (s._count.subjectReservations || 0) === 0 && (s._count.grades || 0) === 0);
+        const withStudents = selectedSubjects.filter(s => (s._count?.subjectReservations || 0) > 0 || (s._count?.grades || 0) > 0);
+        const deletable = selectedSubjects.filter(s => (s._count?.subjectReservations || 0) === 0 && (s._count?.grades || 0) === 0);
 
         return {
             totalSelected: selectedIds.length,
@@ -351,7 +313,7 @@ export default function SubjectsPage() {
                 {
                     accessorKey: "course.code",
                     header: "Course",
-                    cell: ({ row }) => <Badge variant="secondary">{row.original.course.code}</Badge>,
+                    cell: ({ row }) => <Badge variant="secondary">{row.original.course?.code || "—"}</Badge>,
                 },
                 {
                     accessorKey: "units",
@@ -469,19 +431,19 @@ export default function SubjectsPage() {
                             Total subjects: <span className="font-bold text-zinc-900">{total}</span>
                         </CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 w-full md:w-auto">
                         {selectedIds.length > 0 && user?.role === "admin" && (
                             <Button
                                 variant="destructive"
                                 onClick={() => setBulkDeleteOpen(true)}
-                                className="gap-2"
+                                className="gap-2 flex-1 md:flex-none"
                             >
                                 <IconTrash className="size-4" />
                                 Delete ({selectedIds.length})
                             </Button>
                         )}
                         {user?.role === "admin" && selectedIds.length === 0 && (
-                            <Button onClick={handleCreate} className="gap-2">
+                            <Button onClick={handleCreate} className="gap-2 flex-1 md:flex-none">
                                 <IconPlus className="size-4" />
                                 Add Subject
                             </Button>

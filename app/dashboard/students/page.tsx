@@ -6,18 +6,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { studentsApi } from "@/lib/api";
 import { usePageTitle } from "../layout";
-import { StudentForm } from "@/components/student-form";
+import { StudentForm } from "@/components/forms/student-form";
 import { CourseCombobox } from "@/components/course-combobox";
 import { type StudentFormValues } from "@/lib/validations/student";
 import { toast } from "sonner";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,40 +44,12 @@ import { ListFilter, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
     ColumnDef,
-    flexRender,
-    getCoreRowModel,
-    getSortedRowModel,
     SortingState,
-    useReactTable,
 } from "@tanstack/react-table";
-import { IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
-import { cn } from "@/lib/utils";
 import { GenericDataTable } from "@/components/generic-data-table";
 import { CSVImportDialog } from "@/components/csv-import-dialog";
 
-interface Student {
-    id: string;
-    studentNo: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    birthDate: string;
-    courseId: string | null;
-    course: {
-        id: string;
-        code: string;
-        name: string;
-    } | null;
-    createdAt?: string | Date;
-}
-
-interface PaginatedStudents {
-    students: Student[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-}
+import { Student, PaginatedStudents } from "@/types";
 
 import { useAuth } from "@/context/auth-context";
 
@@ -557,12 +521,12 @@ export default function StudentsPage() {
                             Total students: <span className="font-bold text-zinc-900">{total}</span>
                         </CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 w-full md:w-auto">
                         {selectedIds.length > 0 && user?.role === "admin" && (
                             <Button
                                 variant="destructive"
                                 onClick={() => setBulkDeleteOpen(true)}
-                                className="gap-2"
+                                className="gap-2 flex-1 md:flex-none"
                             >
                                 <IconTrash className="size-4" />
                                 Delete ({selectedIds.length})
@@ -594,7 +558,7 @@ export default function StudentsPage() {
                                     queryClient.invalidateQueries({ queryKey: ["recent-students"] });
                                 }}
                                 trigger={
-                                    <Button variant="outline" className="gap-2">
+                                    <Button variant="outline" className="gap-2 flex-1 md:flex-none">
                                         <IconUpload className="size-4" />
                                         Import CSV
                                     </Button>
@@ -602,7 +566,7 @@ export default function StudentsPage() {
                             />
                         )}
                         {selectedIds.length === 0 && (
-                            <Button onClick={handleCreate} className="gap-2">
+                            <Button onClick={handleCreate} className="gap-2 flex-1 md:flex-none">
                                 <IconPlus className="size-4" />
                                 Add Student
                             </Button>

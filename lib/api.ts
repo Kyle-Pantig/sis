@@ -1,6 +1,14 @@
+import {
+    Student, PaginatedStudents, StudentProfile,
+    Course, PaginatedCourses,
+    Subject, PaginatedSubjects,
+    Grade, PaginatedGrades,
+    User, Invitation, PaginatedAuditLogs
+} from "@/types";
+
 const API_URL = ""; // Empty string for relative path because we use Next.js rewrites
 
-export async function fetchApi(endpoint: string, options: RequestInit = {}, shouldThrow: boolean = true) {
+export async function fetchApi<T>(endpoint: string, options: RequestInit = {}, shouldThrow: boolean = true): Promise<T> {
     const response = await fetch(`${API_URL}${endpoint}`, {
         ...options,
         credentials: "include",
@@ -20,18 +28,18 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}, shou
 
 export const authApi = {
     login: (email: string, password: string) =>
-        fetchApi("/api/auth/login", {
+        fetchApi<any>("/api/auth/login", {
             method: "POST",
             body: JSON.stringify({ email, password }),
         }),
-    logout: () => fetchApi("/api/auth/logout", { method: "POST" }),
-    me: () => fetchApi("/api/auth/me"),
-    changePassword: (data: any) => fetchApi("/api/auth/change-password", {
+    logout: () => fetchApi<any>("/api/auth/logout", { method: "POST" }),
+    me: () => fetchApi<User & { error?: string }>("/api/auth/me"),
+    changePassword: (data: any) => fetchApi<any>("/api/auth/change-password", {
         method: "POST",
         body: JSON.stringify(data),
     }),
-    verifyInvite: (token: string) => fetchApi(`/api/auth/verify-invite/${token}`),
-    completeInvite: (data: any) => fetchApi("/api/auth/complete-invite", {
+    verifyInvite: (token: string) => fetchApi<any>(`/api/auth/verify-invite/${token}`),
+    completeInvite: (data: any) => fetchApi<any>("/api/auth/complete-invite", {
         method: "POST",
         body: JSON.stringify(data),
     }),
@@ -42,26 +50,26 @@ export const studentsApi = {
         const params = new URLSearchParams({ page: String(page), limit: String(limit) });
         if (search) params.set("search", search);
         if (courseId) params.set("courseId", courseId);
-        return fetchApi(`/api/students?${params.toString()}`);
+        return fetchApi<PaginatedStudents>(`/api/students?${params.toString()}`);
     },
-    getCount: () => fetchApi("/api/students/count"),
-    getById: (id: string) => fetchApi(`/api/students/${id}`),
-    create: (data: any) => fetchApi("/api/students", {
+    getCount: () => fetchApi<{ count: number }>("/api/students/count"),
+    getById: (id: string) => fetchApi<StudentProfile & { error?: string }>(`/api/students/${id}`),
+    create: (data: any) => fetchApi<Student & { error?: string }>("/api/students", {
         method: "POST",
         body: JSON.stringify(data),
     }, false),
-    update: (id: string, data: any) => fetchApi(`/api/students/${id}`, {
+    update: (id: string, data: any) => fetchApi<Student & { error?: string }>(`/api/students/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
     }, false),
-    delete: (id: string) => fetchApi(`/api/students/${id}`, {
+    delete: (id: string) => fetchApi<any>(`/api/students/${id}`, {
         method: "DELETE",
     }),
-    bulkDelete: (ids: string[]) => fetchApi("/api/students/bulk", {
+    bulkDelete: (ids: string[]) => fetchApi<any>("/api/students/bulk", {
         method: "DELETE",
         body: JSON.stringify({ ids }),
     }),
-    importCsv: (students: any[]) => fetchApi("/api/students/import", {
+    importCsv: (students: any[]) => fetchApi<any>("/api/students/import", {
         method: "POST",
         body: JSON.stringify({ students }),
     }),
@@ -71,29 +79,29 @@ export const coursesApi = {
     getAll: (page: number = 1, limit: number = 10, search?: string) => {
         const params = new URLSearchParams({ page: String(page), limit: String(limit) });
         if (search) params.set("search", search);
-        return fetchApi(`/api/courses?${params.toString()}`);
+        return fetchApi<PaginatedCourses>(`/api/courses?${params.toString()}`);
     },
-    checkCode: (code: string) => fetchApi(`/api/courses/check-code?code=${encodeURIComponent(code)}`),
-    getById: (id: string) => fetchApi(`/api/courses/${id}`),
-    create: (data: any) => fetchApi("/api/courses", {
+    checkCode: (code: string) => fetchApi<{ exists: boolean }>(`/api/courses/check-code?code=${encodeURIComponent(code)}`),
+    getById: (id: string) => fetchApi<Course>(`/api/courses/${id}`),
+    create: (data: any) => fetchApi<Course & { error?: string }>("/api/courses", {
         method: "POST",
         body: JSON.stringify(data),
     }),
-    update: (id: string, data: any) => fetchApi(`/api/courses/${id}`, {
+    update: (id: string, data: any) => fetchApi<Course & { error?: string }>(`/api/courses/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
     }),
-    delete: (id: string, force: boolean = false) => fetchApi(`/api/courses/${id}${force ? "?force=true" : ""}`, {
+    delete: (id: string, force: boolean = false) => fetchApi<any>(`/api/courses/${id}${force ? "?force=true" : ""}`, {
         method: "DELETE",
     }),
-    bulkDelete: (ids: string[], force: boolean = false) => fetchApi("/api/courses/bulk", {
+    bulkDelete: (ids: string[], force: boolean = false) => fetchApi<{ count: number }>("/api/courses/bulk", {
         method: "DELETE",
         body: JSON.stringify({ ids, force }),
     }),
 };
 
 export const reservationsApi = {
-    getByStudent: (studentId: string) => fetchApi(`/api/reservations/student/${studentId}`),
+    getByStudent: (studentId: string) => fetchApi<any[]>(`/api/reservations/student/${studentId}`),
     getAvailable: (studentId: string) => fetchApi(`/api/reservations/available/${studentId}`),
     create: (data: { studentId: string; subjectId: string }) => fetchApi("/api/reservations", {
         method: "POST",
@@ -120,22 +128,22 @@ export const subjectsApi = {
         const params = new URLSearchParams({ page: String(page), limit: String(limit) });
         if (search) params.set("search", search);
         if (courseId) params.set("courseId", courseId);
-        return fetchApi(`/api/subjects?${params.toString()}`);
+        return fetchApi<PaginatedSubjects>(`/api/subjects?${params.toString()}`);
     },
-    getByCourse: (courseId: string) => fetchApi(`/api/subjects/course/${courseId}`),
-    getById: (id: string) => fetchApi(`/api/subjects/${id}`),
-    create: (data: any) => fetchApi("/api/subjects", {
+    getByCourse: (courseId: string) => fetchApi<Subject[]>(`/api/subjects/course/${courseId}`),
+    getById: (id: string) => fetchApi<Subject>(`/api/subjects/${id}`),
+    create: (data: any) => fetchApi<Subject & { error?: string }>("/api/subjects", {
         method: "POST",
         body: JSON.stringify(data),
     }),
-    update: (id: string, data: any) => fetchApi(`/api/subjects/${id}`, {
+    update: (id: string, data: any) => fetchApi<Subject & { error?: string }>(`/api/subjects/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
     }),
-    delete: (id: string, force: boolean = false) => fetchApi(`/api/subjects/${id}${force ? "?force=true" : ""}`, {
+    delete: (id: string, force: boolean = false) => fetchApi<any>(`/api/subjects/${id}${force ? "?force=true" : ""}`, {
         method: "DELETE",
     }),
-    bulkDelete: (ids: string[], force: boolean = false) => fetchApi("/api/subjects/bulk", {
+    bulkDelete: (ids: string[], force: boolean = false) => fetchApi<any>("/api/subjects/bulk", {
         method: "DELETE",
         body: JSON.stringify({ ids, force }),
     }),
@@ -144,7 +152,7 @@ export const subjectsApi = {
         if (code) params.set("code", code);
         if (title) params.set("title", title);
         if (excludeId) params.set("excludeId", excludeId);
-        return fetchApi(`/api/subjects/check-availability?${params.toString()}`);
+        return fetchApi<{ codeExists: boolean; titleExists: boolean }>(`/api/subjects/check-availability?${params.toString()}`);
     },
 };
 
@@ -155,24 +163,24 @@ export const gradesApi = {
         if (subjectId) params.set("subjectId", subjectId);
         if (search) params.set("search", search);
         if (remarks) params.set("remarks", remarks);
-        return fetchApi(`/api/grades?${params.toString()}`);
+        return fetchApi<PaginatedGrades>(`/api/grades?${params.toString()}`);
     },
-    getByStudent: (studentId: string) => fetchApi(`/api/grades/student/${studentId}`),
-    getBySubject: (subjectId: string) => fetchApi(`/api/grades/subject/${subjectId}`),
-    getById: (id: string) => fetchApi(`/api/grades/${id}`),
-    create: (data: any) => fetchApi("/api/grades", {
+    getByStudent: (studentId: string) => fetchApi<Grade[]>(`/api/grades/student/${studentId}`),
+    getBySubject: (subjectId: string) => fetchApi<Grade[]>(`/api/grades/subject/${subjectId}`),
+    getById: (id: string) => fetchApi<Grade>(`/api/grades/${id}`),
+    create: (data: any) => fetchApi<Grade & { error?: string }>("/api/grades", {
         method: "POST",
         body: JSON.stringify(data),
     }),
-    upsert: (data: any) => fetchApi("/api/grades/upsert", {
+    upsert: (data: any) => fetchApi<Grade & { error?: string }>("/api/grades/upsert", {
         method: "PUT",
         body: JSON.stringify(data),
     }),
-    update: (id: string, data: any) => fetchApi(`/api/grades/${id}`, {
+    update: (id: string, data: any) => fetchApi<Grade & { error?: string }>(`/api/grades/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
     }),
-    delete: (id: string) => fetchApi(`/api/grades/${id}`, {
+    delete: (id: string) => fetchApi<any>(`/api/grades/${id}`, {
         method: "DELETE",
     }),
 };
@@ -183,23 +191,23 @@ export const statsApi = {
 };
 
 export const usersApi = {
-    getEncoders: () => fetchApi("/api/users/encoders"),
-    getInvitations: () => fetchApi("/api/users/invitations"),
-    deleteInvitation: (id: string) => fetchApi(`/api/users/invitations/${id}`, {
+    getEncoders: () => fetchApi<User[]>("/api/users/encoders"),
+    getInvitations: () => fetchApi<Invitation[]>("/api/users/invitations"),
+    deleteInvitation: (id: string) => fetchApi<any>(`/api/users/invitations/${id}`, {
         method: "DELETE",
     }),
-    resendInvitation: (id: string) => fetchApi(`/api/users/invitations/${id}/resend`, {
+    resendInvitation: (id: string) => fetchApi<any>(`/api/users/invitations/${id}/resend`, {
         method: "POST",
     }),
-    createEncoder: (data: any) => fetchApi("/api/users/encoders", {
+    createEncoder: (data: any) => fetchApi<any>("/api/users/encoders", {
         method: "POST",
         body: JSON.stringify(data),
     }),
-    toggleStatus: (id: string, isActive: boolean) => fetchApi(`/api/users/${id}/status`, {
+    toggleStatus: (id: string, isActive: boolean) => fetchApi<any>(`/api/users/${id}/status`, {
         method: "PATCH",
         body: JSON.stringify({ isActive }),
     }),
-    deleteEncoder: (id: string) => fetchApi(`/api/users/${id}`, {
+    deleteEncoder: (id: string) => fetchApi<any>(`/api/users/${id}`, {
         method: "DELETE",
     }),
 };
@@ -213,15 +221,15 @@ export const auditApi = {
         if (entityId) params.set("entityId", entityId);
         if (startDate) params.set("startDate", startDate);
         if (endDate) params.set("endDate", endDate);
-        return fetchApi(`/api/audit?${params.toString()}`);
+        return fetchApi<PaginatedAuditLogs>(`/api/audit?${params.toString()}`);
     },
     getFilters: () => {
-        return fetchApi("/api/audit/filters");
+        return fetchApi<{ actions: string[]; entities: string[] }>("/api/audit/filters");
     },
-    delete: (id: string) => fetchApi(`/api/audit/${id}`, {
+    delete: (id: string) => fetchApi<any>(`/api/audit/${id}`, {
         method: "DELETE"
     }),
-    bulkDelete: (ids: string[]) => fetchApi("/api/audit/bulk", {
+    bulkDelete: (ids: string[]) => fetchApi<{ count: number }>("/api/audit/bulk", {
         method: "DELETE",
         body: JSON.stringify({ ids })
     })

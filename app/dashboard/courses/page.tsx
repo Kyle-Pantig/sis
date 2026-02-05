@@ -9,14 +9,6 @@ import { type CourseFormValues } from "@/lib/validations/course";
 import { usePageTitle } from "../layout";
 import { useAuth } from "@/context/auth-context";
 import { toast } from "sonner";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,18 +23,13 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
-import { IconPlus, IconDotsVertical, IconPencil, IconTrash, IconUsers, IconBook, IconLoader2, IconSearch, IconX, IconChevronUp, IconChevronDown, IconSelector, IconExclamationCircle } from "@tabler/icons-react";
+import { IconPlus, IconDotsVertical, IconPencil, IconTrash, IconUsers, IconBook, IconLoader2, IconSearch, IconExclamationCircle } from "@tabler/icons-react";
 import {
     ColumnDef,
-    flexRender,
-    getCoreRowModel,
-    getSortedRowModel,
     SortingState,
-    useReactTable,
 } from "@tanstack/react-table";
-import { cn } from "@/lib/utils";
 import { GenericDataTable } from "@/components/generic-data-table";
-import { CourseForm } from "@/components/course-form";
+import { CourseForm } from "@/components/forms/course-form";
 import {
     Pagination,
     PaginationContent,
@@ -61,24 +48,7 @@ import {
 } from "@/components/ui/select";
 import { X } from "lucide-react";
 
-interface Course {
-    id: string;
-    code: string;
-    name: string;
-    description: string | null;
-    _count: {
-        students: number;
-        subjects: number;
-    };
-}
-
-interface PaginatedCourses {
-    courses: Course[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-}
+import { Course, PaginatedCourses } from "@/types";
 
 export default function CoursesPage() {
     const { setTitle } = usePageTitle();
@@ -198,8 +168,8 @@ export default function CoursesPage() {
 
     const selectionSummary = React.useMemo(() => {
         const selectedCourses = courses.filter(c => selectedIds.includes(c.id));
-        const withDeps = selectedCourses.filter(c => (c._count.students || 0) > 0 || (c._count.subjects || 0) > 0);
-        const deletable = selectedCourses.filter(c => (c._count.students || 0) === 0 && (c._count.subjects || 0) === 0);
+        const withDeps = selectedCourses.filter(c => (c._count?.students || 0) > 0 || (c._count?.subjects || 0) > 0);
+        const deletable = selectedCourses.filter(c => (c._count?.students || 0) === 0 && (c._count?.subjects || 0) === 0);
 
         return {
             totalSelected: selectedIds.length,
@@ -366,7 +336,7 @@ export default function CoursesPage() {
                     meta: { headerClassName: "justify-center" },
                     cell: ({ row }) => (
                         <div className="text-center font-bold text-zinc-900">
-                            {row.original._count.students}
+                            {row.original._count?.students ?? 0}
                         </div>
                     ),
                 },
@@ -381,7 +351,7 @@ export default function CoursesPage() {
                     meta: { headerClassName: "justify-center" },
                     cell: ({ row }) => (
                         <div className="text-center font-bold text-zinc-900">
-                            {row.original._count.subjects}
+                            {row.original._count?.subjects ?? 0}
                         </div>
                     ),
                 },
@@ -486,7 +456,7 @@ export default function CoursesPage() {
 
     return (
         <div className="space-y-6">
-            <Card className="border-none shadow-sm">
+            <Card className="border-none shadow-sm gap-2">
                 <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <CardTitle className="text-xl">Course Masterlist</CardTitle>
@@ -494,19 +464,19 @@ export default function CoursesPage() {
                             Total courses: <span className="font-bold text-zinc-900">{total}</span>
                         </CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 w-full md:w-auto">
                         {selectedIds.length > 0 && user?.role === "admin" && (
                             <Button
                                 variant="destructive"
                                 onClick={() => setBulkDeleteOpen(true)}
-                                className="gap-2"
+                                className="gap-2 flex-1 md:flex-none"
                             >
                                 <IconTrash className="size-4" />
                                 Delete ({selectedIds.length})
                             </Button>
                         )}
                         {user?.role === "admin" && selectedIds.length === 0 && (
-                            <Button onClick={handleCreate} className="gap-2">
+                            <Button onClick={handleCreate} className="gap-2 flex-1 md:flex-none">
                                 <IconPlus className="size-4" />
                                 Add Course
                             </Button>
