@@ -2,14 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { subjectsApi } from "@/lib/api";
 import { usePageTitle } from "../layout";
-import { CourseCombobox } from "@/components/course-combobox";
 import { toast } from "sonner";
 import {
     Table,
@@ -31,32 +27,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-} from "@/components/ui/form";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ListFilter, X } from "lucide-react";
 import {
     Select,
@@ -74,7 +45,7 @@ import {
     PaginationNext,
     PaginationPrevious,
 } from "@/components/ui/pagination";
-import { subjectSchema, type SubjectFormValues } from "@/lib/validations/subject";
+import { type SubjectFormValues } from "@/lib/validations/subject";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IconPlus, IconDotsVertical, IconPencil, IconTrash, IconSearch, IconLoader2, IconX, IconChevronUp, IconChevronDown, IconSelector, IconExclamationCircle } from "@tabler/icons-react";
 import {
@@ -87,6 +58,9 @@ import {
 } from "@tanstack/react-table";
 import { cn } from "@/lib/utils";
 import { GenericDataTable } from "@/components/generic-data-table";
+import { SubjectForm } from "@/components/subject-form";
+import { useAuth } from "@/context/auth-context";
+import { CourseCombobox } from "@/components/course-combobox";
 
 interface Subject {
     id: string;
@@ -113,9 +87,6 @@ interface PaginatedSubjects {
     totalPages: number;
 }
 
-
-
-import { useAuth } from "@/context/auth-context";
 
 export default function SubjectsPage() {
     const { setTitle } = usePageTitle();
@@ -210,9 +181,6 @@ export default function SubjectsPage() {
     // Form state
     const [formOpen, setFormOpen] = useState(false);
     const [formMode, setFormMode] = useState<"create" | "edit">("create");
-    const [checkingAvailability, setCheckingAvailability] = useState(false);
-    const [codeExists, setCodeExists] = useState(false);
-    const [titleExists, setTitleExists] = useState(false);
     const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
 
     // Delete state
@@ -235,40 +203,6 @@ export default function SubjectsPage() {
         };
     }, [subjects, selectedIds]);
 
-    // React Hook Form
-    const form = useForm<SubjectFormValues>({
-        resolver: zodResolver(subjectSchema) as any,
-        defaultValues: {
-            courseId: "",
-            code: "",
-            title: "",
-            units: 3,
-        },
-    });
-
-    const checkAvailability = async (codeValue?: string, titleValue?: string, courseIdValue?: string) => {
-        const cId = courseIdValue || form.getValues("courseId");
-        const code = codeValue !== undefined ? codeValue : form.getValues("code");
-        const title = titleValue !== undefined ? titleValue : form.getValues("title");
-
-        if (!cId || (!code && !title)) {
-            setCodeExists(false);
-            setTitleExists(false);
-            return;
-        }
-
-        if (code.length >= 2 || title.length >= 3) {
-            try {
-                const res = await subjectsApi.checkAvailability(cId, code, title, selectedSubject?.id);
-                setCodeExists(!!res.codeExists);
-                setTitleExists(!!res.titleExists);
-            } catch (err) { }
-        } else {
-            setCodeExists(false);
-            setTitleExists(false);
-        }
-    };
-
     useEffect(() => {
         setTitle("Subject Management");
     }, [setTitle]);
@@ -285,24 +219,13 @@ export default function SubjectsPage() {
 
     function handleCreate() {
         setSelectedSubject(null);
-        form.reset({ courseId: "", code: "", title: "", units: 3 });
         setFormMode("create");
-        setCodeExists(false);
-        setTitleExists(false);
         setFormOpen(true);
     }
 
     function handleEdit(subject: Subject) {
         setSelectedSubject(subject);
-        form.reset({
-            courseId: subject.courseId,
-            code: subject.code,
-            title: subject.title,
-            units: subject.units,
-        });
         setFormMode("edit");
-        setCodeExists(false);
-        setTitleExists(false);
         setFormOpen(true);
     }
 
@@ -312,33 +235,6 @@ export default function SubjectsPage() {
     }
 
     async function onSubmit(data: SubjectFormValues) {
-        // Final availability check before submitting
-        try {
-            setCheckingAvailability(true);
-            const res = await subjectsApi.checkAvailability(
-                data.courseId,
-                data.code,
-                data.title,
-                selectedSubject?.id
-            );
-
-            if (res.codeExists) {
-                setCodeExists(true);
-                toast.error("Subject code already exists for this course");
-                return;
-            }
-
-            if (res.titleExists) {
-                setTitleExists(true);
-                toast.error("Subject title already exists for this course");
-                return;
-            }
-        } catch (error) {
-            // If check fails, we might want to continue or show error
-        } finally {
-            setCheckingAvailability(false);
-        }
-
         await mutation.mutateAsync({
             mode: formMode,
             data,
@@ -395,11 +291,18 @@ export default function SubjectsPage() {
         router.push("/dashboard/subjects");
     }
 
+    const areAllSelected = subjects.length > 0 && subjects.every(s => selectedIds.includes(s.id));
+    const isAnySelected = subjects.length > 0 && subjects.some(s => selectedIds.includes(s.id));
+
     function toggleSelectAll() {
-        if (selectedIds.length === subjects.length) {
-            setSelectedIds([]);
+        if (areAllSelected) {
+            // Deselect all on current page
+            const currentIds = subjects.map(s => s.id);
+            setSelectedIds(prev => prev.filter(id => !currentIds.includes(id)));
         } else {
-            setSelectedIds(subjects.map((s) => s.id));
+            // Select all on current page
+            const currentIds = subjects.map(s => s.id);
+            setSelectedIds(prev => Array.from(new Set([...prev, ...currentIds])));
         }
     }
 
@@ -419,7 +322,7 @@ export default function SubjectsPage() {
                     id: "select",
                     header: ({ table }) => (
                         <Checkbox
-                            checked={subjects.length > 0 && selectedIds.length === subjects.length}
+                            checked={areAllSelected ? true : isAnySelected ? "indeterminate" : false}
                             onCheckedChange={toggleSelectAll}
                         />
                     ),
@@ -468,8 +371,8 @@ export default function SubjectsPage() {
                         return (
                             <div className="text-right">
                                 <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="size-8">
+                                    <DropdownMenuTrigger asChild disabled={selectedIds.length > 0}>
+                                        <Button variant="ghost" size="icon" className="size-8" disabled={selectedIds.length > 0}>
                                             <IconDotsVertical className="size-4" />
                                         </Button>
                                     </DropdownMenuTrigger>
@@ -507,7 +410,7 @@ export default function SubjectsPage() {
 
             return cols;
         },
-        [selectedIds, user]
+        [selectedIds, user, subjects]
     );
 
     const isSubmitting = mutation.isPending;
@@ -577,7 +480,7 @@ export default function SubjectsPage() {
                                 Delete ({selectedIds.length})
                             </Button>
                         )}
-                        {user?.role === "admin" && (
+                        {user?.role === "admin" && selectedIds.length === 0 && (
                             <Button onClick={handleCreate} className="gap-2">
                                 <IconPlus className="size-4" />
                                 Add Subject
@@ -753,298 +656,153 @@ export default function SubjectsPage() {
             </div>
 
             {/* Create/Edit Dialog */}
-            <Dialog open={formOpen} onOpenChange={setFormOpen}>
-                <DialogContent className="sm:max-w-[500px]" onOpenAutoFocus={(e) => e.preventDefault()}>
-                    <DialogHeader>
-                        <DialogTitle className="text-xl font-bold">
-                            {formMode === "create" ? "Add New Subject" : "Edit Subject"}
-                        </DialogTitle>
-                        <DialogDescription>
-                            {formMode === "create"
-                                ? "Fill in the details below to create a new subject."
-                                : "Update the subject information below."}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmit) as any} className="space-y-4">
-                            <FormField
-                                control={form.control as any}
-                                name="courseId"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Course *</FormLabel>
-                                        <FormControl>
-                                            <CourseCombobox
-                                                value={field.value}
-                                                onValueChange={(val) => {
-                                                    field.onChange(val);
-                                                    checkAvailability(undefined, undefined, val);
-                                                }}
-                                                placeholder="Select a course"
-                                                className="w-full"
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control as any}
-                                name="code"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Subject Code *</FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                placeholder="e.g., CS101"
-                                                {...field}
-                                                onChange={(e) => {
-                                                    const val = e.target.value.toUpperCase();
-                                                    field.onChange(val);
-                                                    checkAvailability(val);
-                                                }}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                        {codeExists && (
-                                            <p className="text-[11px] font-medium text-red-500 mt-1 flex items-center gap-1">
-                                                <IconExclamationCircle className="size-3" />
-                                                This code is already used in this course.
-                                            </p>
-                                        )}
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control as any}
-                                name="title"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Subject Title *</FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                placeholder="e.g., Introduction to Programming"
-                                                {...field}
-                                                onChange={(e) => {
-                                                    field.onChange(e.target.value);
-                                                    checkAvailability(undefined, e.target.value);
-                                                }}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                        {titleExists && (
-                                            <p className="text-[11px] font-medium text-red-500 mt-1 flex items-center gap-1">
-                                                <IconExclamationCircle className="size-3" />
-                                                This title is already used in this course.
-                                            </p>
-                                        )}
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control as any}
-                                name="units"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Units *</FormLabel>
-                                        <FormControl>
-                                            <Input type="number" min={1} max={10} {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <DialogFooter className="pt-4">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setFormOpen(false)}
-                                    disabled={isSubmitting || checkingAvailability}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    disabled={isSubmitting || checkingAvailability || codeExists || titleExists}
-                                    className="min-w-[100px]"
-                                >
-                                    {isSubmitting || checkingAvailability ? (
-                                        <>
-                                            <IconLoader2 className="size-4 mr-2 animate-spin" />
-                                            {checkingAvailability ? "Checking..." : (formMode === "create" ? "Creating..." : "Saving...")}
-                                        </>
-                                    ) : (
-                                        formMode === "create" ? "Create Subject" : "Save Changes"
-                                    )}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </Form>
-                </DialogContent>
-            </Dialog>
+            <SubjectForm
+                open={formOpen}
+                onOpenChange={setFormOpen}
+                onSubmit={onSubmit}
+                defaultValues={selectedSubject ? {
+                    courseId: selectedSubject.courseId,
+                    code: selectedSubject.code,
+                    title: selectedSubject.title,
+                    units: selectedSubject.units
+                } : undefined}
+                mode={formMode}
+                isSubmitting={isSubmitting}
+            />
 
             {/* Delete Dialog */}
-            <AlertDialog open={deleteOpen} onOpenChange={(open) => {
-                setDeleteOpen(open);
-                if (!open) {
-                    setIsForceDelete(false);
+            <ConfirmDialog
+                open={deleteOpen}
+                onOpenChange={(open) => {
+                    setDeleteOpen(open);
+                    if (!open) setIsForceDelete(false);
+                }}
+                title="Delete Subject"
+                description={
+                    <span>
+                        Are you sure you want to delete <span className="font-semibold text-zinc-900">{subjectToDelete?.title}</span>?
+                    </span>
                 }
-            }}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Subject</AlertDialogTitle>
-                        <AlertDialogDescription className="space-y-4">
-                            <div className="text-zinc-600 text-sm">
-                                Are you sure you want to delete <span className="font-semibold text-zinc-900">{subjectToDelete?.title}</span>?
-                            </div>
-
-                            {(subjectToDelete?._count?.subjectReservations ?? 0) > 0 || (subjectToDelete?._count?.grades ?? 0) > 0 ? (
-                                <>
-                                    {!isForceDelete && (
-                                        <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-amber-800 text-xs flex items-start gap-2">
-                                            <IconExclamationCircle className="size-4 shrink-0 mt-0.5" />
-                                            <div>
-                                                <p className="font-semibold mb-1">Students are currently enrolled</p>
-                                                <p>This subject has active reservations or grades. Standard deletion will fail.</p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="flex items-center space-x-2 pt-2 pb-1">
-                                        <Checkbox
-                                            id="force-delete-single"
-                                            checked={isForceDelete}
-                                            onCheckedChange={(checked) => setIsForceDelete(!!checked)}
-                                        />
-                                        <label
-                                            htmlFor="force-delete-single"
-                                            className="text-xs font-medium leading-none cursor-pointer select-none text-zinc-700"
-                                        >
-                                            Force delete (Auto-unenroll students & remove grades)
-                                        </label>
-                                    </div>
-
-                                    {isForceDelete && (
-                                        <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-red-800 text-xs flex items-start gap-2">
-                                            <IconExclamationCircle className="size-4 shrink-0 mt-0.5" />
-                                            <div>
-                                                <p className="font-bold mb-1 underline">DANGER: PERMANENT DATA LOSS</p>
-                                                <p>This will permanently remove ALL associated student records for this subject.</p>
-                                            </div>
-                                        </div>
-                                    )}
-                                </>
-                            ) : (
-                                <div className="text-red-600 font-medium text-sm">This action cannot be undone.</div>
-                            )}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={(e) => {
-                                e.preventDefault();
-                                handleDelete();
-                            }}
-                            disabled={isDeleting || (!isForceDelete && ((subjectToDelete?._count?.subjectReservations ?? 0) > 0 || (subjectToDelete?._count?.grades ?? 0) > 0))}
-                            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
-                        >
-                            {isDeleting ? (
-                                <>
-                                    <IconLoader2 className="size-4 mr-2 animate-spin" />
-                                    Deleting...
-                                </>
-                            ) : (
-                                "Delete Subject"
-                            )}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
-            {/* Bulk Delete Dialog */}
-            <AlertDialog open={bulkDeleteOpen} onOpenChange={(open) => {
-                setBulkDeleteOpen(open);
-                if (!open) {
-                    setIsForceDelete(false);
-                }
-            }}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Multiple Subjects</AlertDialogTitle>
-                        <AlertDialogDescription className="space-y-4">
-                            <div className="text-zinc-600 text-sm">
-                                You have selected <span className="font-bold text-zinc-900">{selectionSummary.totalSelected}</span> subjects.
-                            </div>
-
-                            {!isForceDelete && selectionSummary.withStudents > 0 && (
+                confirmText={isDeleting ? "Deleting..." : "Delete Subject"}
+                variant="destructive"
+                isLoading={isDeleting}
+                disabled={!isForceDelete && ((subjectToDelete?._count?.subjectReservations ?? 0) > 0 || (subjectToDelete?._count?.grades ?? 0) > 0)}
+                onConfirm={(e) => {
+                    e.preventDefault();
+                    handleDelete();
+                }}
+            >
+                <div className="space-y-4 py-2">
+                    {((subjectToDelete?._count?.subjectReservations ?? 0) > 0 || (subjectToDelete?._count?.grades ?? 0) > 0) && (
+                        <>
+                            {!isForceDelete && (
                                 <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-amber-800 text-xs flex items-start gap-2">
                                     <IconExclamationCircle className="size-4 shrink-0 mt-0.5" />
                                     <div>
-                                        <p className="font-semibold mb-1">{selectionSummary.withStudents} subjects cannot be deleted</p>
-                                        <p>These subjects have students currently enrolled or have existing grades. They will be automatically skipped.</p>
+                                        <p className="font-semibold mb-1">Students are currently enrolled</p>
+                                        <p>This subject has active reservations or grades. Standard deletion will fail.</p>
                                     </div>
                                 </div>
                             )}
 
-                            {selectionSummary.withStudents > 0 && (
-                                <div className="flex items-center space-x-2 pt-2 pb-1">
-                                    <Checkbox
-                                        id="force-delete"
-                                        checked={isForceDelete}
-                                        onCheckedChange={(checked) => setIsForceDelete(!!checked)}
-                                    />
-                                    <label
-                                        htmlFor="force-delete"
-                                        className="text-xs font-medium leading-none cursor-pointer select-none text-zinc-700"
-                                    >
-                                        Force delete (Auto-unenroll students & remove grades)
-                                    </label>
-                                </div>
-                            )}
+                            <div className="flex items-center space-x-2 pt-2 pb-1">
+                                <Checkbox
+                                    id="force-delete-single"
+                                    checked={isForceDelete}
+                                    onCheckedChange={(checked) => setIsForceDelete(!!checked)}
+                                />
+                                <label
+                                    htmlFor="force-delete-single"
+                                    className="text-xs font-medium leading-none cursor-pointer select-none text-zinc-700"
+                                >
+                                    Force delete (Auto-unenroll students & remove grades)
+                                </label>
+                            </div>
 
                             {isForceDelete && (
                                 <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-red-800 text-xs flex items-start gap-2">
                                     <IconExclamationCircle className="size-4 shrink-0 mt-0.5" />
                                     <div>
                                         <p className="font-bold mb-1 underline">DANGER: PERMANENT DATA LOSS</p>
-                                        <p>Forcing deletion will permanently remove ALL student reservations and grades associated with these subjects.</p>
+                                        <p>This will permanently remove ALL associated student records for this subject.</p>
                                     </div>
                                 </div>
                             )}
+                        </>
+                    )}
+                    <div className="text-red-600 font-medium text-sm">This action cannot be undone.</div>
+                </div>
+            </ConfirmDialog>
 
-                            <div className="text-zinc-600 text-sm leading-relaxed">
-                                {isForceDelete ? (
-                                    <>Are you sure you want to delete <span className="font-bold text-red-600">ALL {selectionSummary.totalSelected}</span> selected subjects?</>
-                                ) : (
-                                    <>Are you sure you want to delete the remaining <span className="font-bold text-red-600">{selectionSummary.deletable}</span> subjects?</>
-                                )}
-                                <p className="mt-1 font-medium text-red-500">This action cannot be undone.</p>
+            {/* Bulk Delete Dialog */}
+            <ConfirmDialog
+                open={bulkDeleteOpen}
+                onOpenChange={(open) => {
+                    setBulkDeleteOpen(open);
+                    if (!open) setIsForceDelete(false);
+                }}
+                title="Delete Multiple Subjects"
+                description={
+                    <span>
+                        You have selected <span className="font-bold text-zinc-900">{selectionSummary.totalSelected}</span> subjects.
+                    </span>
+                }
+                confirmText={isBulkDeleting ? "Deleting..." : `Delete ${isForceDelete ? selectionSummary.totalSelected : selectionSummary.deletable} Subjects`}
+                variant="destructive"
+                isLoading={isBulkDeleting}
+                disabled={isBulkDeleting || (!isForceDelete && selectionSummary.deletable === 0)}
+                onConfirm={(e) => {
+                    e.preventDefault();
+                    handleBulkDelete();
+                }}
+            >
+                <div className="space-y-4 py-2">
+                    {!isForceDelete && selectionSummary.withStudents > 0 && (
+                        <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-amber-800 text-xs flex items-start gap-2">
+                            <IconExclamationCircle className="size-4 shrink-0 mt-0.5" />
+                            <div>
+                                <p className="font-semibold mb-1">{selectionSummary.withStudents} subjects cannot be deleted</p>
+                                <p>These subjects have students currently enrolled or have existing grades. They will be automatically skipped.</p>
                             </div>
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isBulkDeleting}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={(e) => {
-                                e.preventDefault();
-                                handleBulkDelete();
-                            }}
-                            disabled={isBulkDeleting || (!isForceDelete && selectionSummary.deletable === 0)}
-                            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
-                        >
-                            {isBulkDeleting ? (
-                                <>
-                                    <IconLoader2 className="size-4 mr-2 animate-spin" />
-                                    Deleting...
-                                </>
-                            ) : (
-                                `Delete ${isForceDelete ? selectionSummary.totalSelected : selectionSummary.deletable} Subjects`
-                            )}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                        </div>
+                    )}
+
+                    {selectionSummary.withStudents > 0 && (
+                        <div className="flex items-center space-x-2 pt-2 pb-1">
+                            <Checkbox
+                                id="force-delete"
+                                checked={isForceDelete}
+                                onCheckedChange={(checked) => setIsForceDelete(!!checked)}
+                            />
+                            <label
+                                htmlFor="force-delete"
+                                className="text-xs font-medium leading-none cursor-pointer select-none text-zinc-700"
+                            >
+                                Force delete (Auto-unenroll students & remove grades)
+                            </label>
+                        </div>
+                    )}
+
+                    {isForceDelete && (
+                        <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-red-800 text-xs flex items-start gap-2">
+                            <IconExclamationCircle className="size-4 shrink-0 mt-0.5" />
+                            <div>
+                                <p className="font-bold mb-1 underline">DANGER: PERMANENT DATA LOSS</p>
+                                <p>Forcing deletion will permanently remove ALL student reservations and grades associated with these subjects.</p>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="text-zinc-600 text-sm leading-relaxed">
+                        {isForceDelete ? (
+                            <>Are you sure you want to delete <span className="font-bold text-red-600">ALL {selectionSummary.totalSelected}</span> selected subjects?</>
+                        ) : (
+                            <>Are you sure you want to delete the remaining <span className="font-bold text-red-600">{selectionSummary.deletable}</span> subjects?</>
+                        )}
+                        <p className="mt-1 font-medium text-red-500">This action cannot be undone.</p>
+                    </div>
+                </div>
+            </ConfirmDialog>
         </div>
     );
 }

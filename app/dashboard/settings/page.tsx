@@ -831,13 +831,6 @@ function AuditLogsTab() {
         label: e
     }));
 
-    // Add "All" option manually if needed, or handle empty value as All
-    // GenericCombobox handles selection, but we want an explicit "All" maybe?
-    // Actually the GenericCombobox allows clearing, which is effectively "All". 
-    // But for UI clarity properly labelled "All Actions" item is good, 
-    // OR we just strictly use the clear capability.
-    // The previous Select had "All Actions".
-
     // Let's prepend "All" options
     const fullActionOptions = [
         { value: "all", label: "All Actions" },
@@ -1016,7 +1009,7 @@ function AuditLogsTab() {
                                 <AlertDialogTrigger asChild>
                                     <Button variant="destructive" size="sm" className="gap-2 h-9">
                                         <IconTrash className="size-4" />
-                                        Delete Selected ({selectedIds.length})
+                                        Delete ({selectedIds.length})
                                     </Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>

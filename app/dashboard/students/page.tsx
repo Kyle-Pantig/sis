@@ -7,7 +7,6 @@ import { useSearchParams } from "next/navigation";
 import { studentsApi } from "@/lib/api";
 import { usePageTitle } from "../layout";
 import { StudentForm } from "@/components/student-form";
-import { DeleteStudentDialog } from "@/components/delete-student-dialog";
 import { CourseCombobox } from "@/components/course-combobox";
 import { type StudentFormValues } from "@/lib/validations/student";
 import { toast } from "sonner";
@@ -31,16 +30,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { IconPlus, IconDotsVertical, IconPencil, IconTrash, IconEye, IconLoader2, IconSearch, IconCheck, IconX, IconUpload } from "@tabler/icons-react";
 import {
     Pagination,
@@ -325,11 +315,18 @@ export default function StudentsPage() {
         router.push("/dashboard/students");
     }
 
+    const areAllSelected = students.length > 0 && students.every(s => selectedIds.includes(s.id));
+    const isAnySelected = students.length > 0 && students.some(s => selectedIds.includes(s.id));
+
     function toggleSelectAll() {
-        if (selectedIds.length === students.length) {
-            setSelectedIds([]);
+        if (areAllSelected) {
+            // Deselect all on current page
+            const currentIds = students.map(s => s.id);
+            setSelectedIds(prev => prev.filter(id => !currentIds.includes(id)));
         } else {
-            setSelectedIds(students.map((s) => s.id));
+            // Select all on current page
+            const currentIds = students.map(s => s.id);
+            setSelectedIds(prev => Array.from(new Set([...prev, ...currentIds])));
         }
     }
 
@@ -352,7 +349,7 @@ export default function StudentsPage() {
                 id: "select",
                 header: ({ table }) => (
                     <Checkbox
-                        checked={students.length > 0 && selectedIds.length === students.length}
+                        checked={areAllSelected ? true : isAnySelected ? "indeterminate" : false}
                         onCheckedChange={toggleSelectAll}
                     />
                 ),
@@ -457,8 +454,8 @@ export default function StudentsPage() {
                     return (
                         <div className="text-right">
                             <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="size-8">
+                                <DropdownMenuTrigger asChild disabled={selectedIds.length > 0}>
+                                    <Button variant="ghost" size="icon" className="size-8" disabled={selectedIds.length > 0}>
                                         <IconDotsVertical className="size-4" />
                                     </Button>
                                 </DropdownMenuTrigger>
@@ -495,7 +492,7 @@ export default function StudentsPage() {
                 enableSorting: false,
             }
         ],
-        [editingId, editValues, isInlineUpdating, selectedIds, user]
+        [editingId, editValues, isInlineUpdating, selectedIds, user, students]
     );
 
     if (loading) {
@@ -571,7 +568,7 @@ export default function StudentsPage() {
                                 Delete ({selectedIds.length})
                             </Button>
                         )}
-                        {user?.role === "admin" && (
+                        {user?.role === "admin" && selectedIds.length === 0 && (
                             <CSVImportDialog
                                 onImport={async (data) => {
                                     const result = await studentsApi.importCsv(data);
@@ -604,10 +601,12 @@ export default function StudentsPage() {
                                 }
                             />
                         )}
-                        <Button onClick={handleCreate} className="gap-2">
-                            <IconPlus className="size-4" />
-                            Add Student
-                        </Button>
+                        {selectedIds.length === 0 && (
+                            <Button onClick={handleCreate} className="gap-2">
+                                <IconPlus className="size-4" />
+                                Add Student
+                            </Button>
+                        )}
                     </div>
                 </CardHeader>
 
@@ -795,49 +794,50 @@ export default function StudentsPage() {
             />
 
             {/* Delete Dialog */}
-            <DeleteStudentDialog
+            <ConfirmDialog
                 open={deleteOpen}
                 onOpenChange={setDeleteOpen}
-                onConfirm={handleDelete}
-                studentName={studentToDelete ? `${studentToDelete.firstName} ${studentToDelete.lastName}` : ""}
-                isDeleting={isDeleting}
-            />
+                title="Delete Student"
+                description={
+                    <span>
+                        Are you sure you want to delete <span className="font-semibold text-zinc-900">
+                            {studentToDelete ? `${studentToDelete.firstName} ${studentToDelete.lastName}` : ""}
+                        </span>?
+                    </span>
+                }
+                confirmText={isDeleting ? "Deleting..." : "Delete Student"}
+                variant="destructive"
+                isLoading={isDeleting}
+                onConfirm={(e) => {
+                    e.preventDefault();
+                    handleDelete();
+                }}
+            >
+                <div>
+                    <div className="text-red-600 font-medium text-sm">This action cannot be undone.</div>
+                </div>
+            </ConfirmDialog>
 
             {/* Bulk Delete Dialog */}
-            <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Multiple Students</AlertDialogTitle>
-                        <AlertDialogDescription className="space-y-2">
-                            <div className="text-muted-foreground text-sm">
-                                Are you sure you want to delete{" "}
-                                <span className="font-semibold text-zinc-900">{selectedIds.length} students</span>?
-                            </div>
-                            <div className="text-red-600 font-medium text-sm">This action cannot be undone.</div>
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isBulkDeleting}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={(e) => {
-                                e.preventDefault();
-                                handleBulkDelete();
-                            }}
-                            disabled={isBulkDeleting}
-                            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
-                        >
-                            {isBulkDeleting ? (
-                                <>
-                                    <IconLoader2 className="size-4 mr-2 animate-spin" />
-                                    Deleting...
-                                </>
-                            ) : (
-                                `Delete ${selectedIds.length} Students`
-                            )}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            <ConfirmDialog
+                open={bulkDeleteOpen}
+                onOpenChange={setBulkDeleteOpen}
+                title="Delete Multiple Students"
+                description={
+                    <span>
+                        Are you sure you want to delete <span className="font-semibold text-zinc-900">{selectedIds.length} students</span>?
+                    </span>
+                }
+                confirmText={isBulkDeleting ? "Deleting..." : `Delete ${selectedIds.length} Students`}
+                variant="destructive"
+                isLoading={isBulkDeleting}
+                onConfirm={(e) => {
+                    e.preventDefault();
+                    handleBulkDelete();
+                }}
+            >
+                <div className="text-red-600 font-medium text-sm">This action cannot be undone.</div>
+            </ConfirmDialog>
         </div>
     );
 }

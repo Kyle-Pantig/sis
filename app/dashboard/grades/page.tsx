@@ -2,9 +2,6 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { gradesApi, subjectsApi, studentsApi, reservationsApi } from "@/lib/api";
@@ -60,18 +57,11 @@ import {
     useReactTable,
 } from "@tanstack/react-table";
 
-import { gradeSchema, type GradeFormValues } from "@/lib/validations/grade";
-import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-} from "@/components/ui/form";
+import { type GradeFormValues } from "@/lib/validations/grade";
 import { ListFilter, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GenericDataTable } from "@/components/generic-data-table";
+import { GradeForm } from "@/components/grade-form";
 
 interface Grade {
     id: string;
@@ -158,26 +148,7 @@ export default function GradesPage() {
 
     // Track handled deep links to avoid re-triggering after save
     const handledDeepLinkRef = useRef<string | null>(null);
-
-    const form = useForm<GradeFormValues>({
-        resolver: zodResolver(gradeSchema) as any,
-        defaultValues: {
-            studentId: "",
-            subjectId: "",
-            courseId: "",
-            prelim: "",
-            midterm: "",
-            finals: "",
-            remarks: "",
-        }
-    });
-
-    const formCourseId = form.watch("courseId");
-    const formStudentId = form.watch("studentId");
-    const formSubjectId = form.watch("subjectId");
-    const formPrelim = form.watch("prelim");
-    const formMidterm = form.watch("midterm");
-    const formFinals = form.watch("finals");
+    const [defaultValues, setDefaultValues] = useState<Partial<GradeFormValues> | undefined>(undefined);
 
     // Queries
     const { data, isLoading: loading, isFetching } = useQuery<PaginatedGrades>({
@@ -186,126 +157,24 @@ export default function GradesPage() {
         placeholderData: (previousData) => previousData,
     });
 
-    const { data: existingGradesData, isLoading: loadingExistingGrades } = useQuery<Grade[]>({
-        queryKey: ["student-grades", formStudentId],
-        queryFn: () => gradesApi.getByStudent(formStudentId),
-        enabled: addOpen && !!formStudentId,
+    const { data: subjectsData } = useQuery({
+        queryKey: ["subjects-filter", filterCourse],
+        queryFn: () => subjectsApi.getAll(1, 1000, undefined, filterCourse || undefined),
+        staleTime: 1000 * 60 * 5, // Cache for 5 mins
     });
+    const subjects = (subjectsData?.subjects || []) as Subject[];
 
-    const { data: reservationsData, isLoading: loadingReservations } = useQuery<any[]>({
-        queryKey: ["student-reservations", formStudentId],
-        queryFn: () => reservationsApi.getByStudent(formStudentId),
-        enabled: addOpen && !!formStudentId,
-    });
-
-
-
-    const { data: subjectsData, isLoading: loadingSubjects } = useQuery<{ subjects: Subject[] }>({
-        queryKey: ["subjects-list", filterCourse],
-        queryFn: () => subjectsApi.getAll(1, 200, undefined, filterCourse || undefined),
-        enabled: true,
-    });
-
-    const { data: studentsData, isLoading: loadingStudents } = useQuery<{ students: Student[] }>({
-        queryKey: ["students-for-grade", formCourseId],
-        queryFn: () => studentsApi.getAll(1, 500),
-        enabled: addOpen,
-    });
-
-    // Auto-populate form when selecting an existing grade
-    React.useEffect(() => {
-        if (!formStudentId) return;
-
-        if (!formSubjectId) {
-            form.setValue("prelim", "");
-            form.setValue("midterm", "");
-            form.setValue("finals", "");
-            form.setValue("remarks", "");
-            return;
-        }
-
-        if (!Array.isArray(existingGradesData)) return;
-
-        const existingGrade = existingGradesData.find((g: Grade) => g.subjectId === formSubjectId);
-
-        if (existingGrade) {
-            // If it's a "Pending" grade, we treat it as new, so don't show "Pending" in remarks
-            const isPending = existingGrade.remarks === "Pending";
-
-            form.setValue("prelim", existingGrade.prelim ? Number(existingGrade.prelim) : "");
-            form.setValue("midterm", existingGrade.midterm ? Number(existingGrade.midterm) : "");
-            form.setValue("finals", existingGrade.finals ? Number(existingGrade.finals) : "");
-            form.setValue("remarks", isPending ? "" : (existingGrade.remarks || ""));
-        } else {
-            // Only clear if we really switched to a new subject
-            form.setValue("prelim", "");
-            form.setValue("midterm", "");
-            form.setValue("finals", "");
-            form.setValue("remarks", "");
-        }
-    }, [formSubjectId, existingGradesData, formStudentId, form]);
+    // Keeping subjects list if used for filters (e.g. subject dropdown filter if it exists)
 
     const grades = data?.grades || [];
     const totalPages = data?.totalPages || 1;
     const total = data?.total || 0;
-    const subjects = subjectsData?.subjects || [];
-    const students = studentsData?.students?.filter((s: Student) => !formCourseId || s.courseId === formCourseId) || [];
-
-    // Filter subjects for dropdown based on selected course for new grade
-    // We treat "Pending" grades as if they haven't been graded yet (Add mode)
-    // Real existing grades are those that are NOT "Pending"
-
-    const reservedSubjectIds = Array.isArray(reservationsData) ? reservationsData.map((r: any) => r.subjectId) : [];
-
-    const selectedGrade = Array.isArray(existingGradesData)
-        ? existingGradesData.find((g: Grade) => g.subjectId === formSubjectId)
-        : null;
-
-    const isEditing = !!(selectedGrade && selectedGrade.remarks !== "Pending");
-
-    // Build subject options with disabled states
-    const subjectOptions = subjects
-        .filter((s) => !formCourseId || s.courseId === formCourseId)
-        .map((s) => {
-            const existingGrade = Array.isArray(existingGradesData)
-                ? existingGradesData.find((g: Grade) => g.subjectId === s.id)
-                : null;
-
-            const isFullyGraded = existingGrade && existingGrade.remarks !== "Pending";
-            const isPending = existingGrade && existingGrade.remarks === "Pending";
-            const isNotEnrolled = formStudentId && !reservedSubjectIds.includes(s.id);
-
-            let disabled = false;
-            let disabledReason = "";
-
-            if (isFullyGraded) {
-                // Allow selection for editing
-                disabled = false;
-                disabledReason = "Edit Grade"; // Indicates it has a grade
-            } else if (isNotEnrolled) {
-                disabled = true;
-                disabledReason = "Not enrolled";
-            } else if (isPending) {
-                // It's pending, so it's available for "Add Grade"
-                // We don't need a special label, or maybe distinct one?
-                // Letting it appear as a normal subject implies "Add".
-            }
-
-            return {
-                value: s.id,
-                label: `${s.code} - ${s.title}`,
-                disabled,
-                disabledReason,
-            };
-        });
 
     const clearDeepLinkMetadata = () => {
         const nextParams = new URLSearchParams(searchParams.toString());
         nextParams.delete("add");
         nextParams.delete("editId");
         nextParams.delete("subjectId");
-
-        // We keep 'search', 'studentId', and 'courseId' to maintain the filtered view
         router.replace(`/dashboard/grades?${nextParams.toString()}`, { scroll: false });
     };
 
@@ -342,7 +211,6 @@ export default function GradesPage() {
             queryClient.invalidateQueries({ queryKey: ["grades"] });
             queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
             setAddOpen(false);
-            form.reset();
             clearDeepLinkMetadata();
         },
         onError: (error: any) => {
@@ -404,7 +272,7 @@ export default function GradesPage() {
         if (add === "true" && !editingId && !addOpen) {
             const courseId = searchParams.get("courseId") || "";
             handledDeepLinkRef.current = deepLinkKey;
-            form.reset({
+            setDefaultValues({
                 studentId: studentId || "",
                 subjectId: subjectId || "",
                 courseId: courseId || "",
@@ -415,7 +283,7 @@ export default function GradesPage() {
             });
             setAddOpen(true);
         }
-    }, [searchParams, data, loading, editingId, addOpen, form]);
+    }, [searchParams, data, loading, editingId, addOpen]);
 
     function startEdit(grade: Grade) {
         setEditingId(grade.id);
@@ -1092,211 +960,14 @@ export default function GradesPage() {
                 </Pagination>
             </div>
 
-            {/* Add Grade Dialog */}
-            <Dialog open={addOpen} onOpenChange={(open) => {
-                setAddOpen(open);
-                if (!open) form.reset();
-            }}>
-                <DialogContent className="sm:max-w-[500px]!" onOpenAutoFocus={(e) => e.preventDefault()}>
-                    <DialogHeader>
-                        <DialogTitle className="text-xl font-bold">{isEditing ? "Edit Grade" : "Add New Grade"}</DialogTitle>
-                        <DialogDescription>{isEditing ? "Update existing grades for the selected subject." : "Enter grades for a student in a specific subject."}</DialogDescription>
-                    </DialogHeader>
-
-                    <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                            <FormField
-                                control={form.control as any}
-                                name="courseId"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Course *</FormLabel>
-                                        <FormControl>
-                                            <CourseCombobox
-                                                value={field.value}
-                                                onValueChange={(v) => {
-                                                    field.onChange(v);
-                                                    form.setValue("studentId", "");
-                                                    form.setValue("subjectId", "");
-                                                }}
-                                                placeholder="Select course"
-                                                className="w-full"
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <FormField
-                                control={form.control as any}
-                                name="studentId"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Student *</FormLabel>
-                                        <FormControl>
-                                            <GenericCombobox
-                                                value={field.value}
-                                                onValueChange={(v) => {
-                                                    field.onChange(v);
-                                                    form.setValue("subjectId", "");
-                                                }}
-                                                items={students.map((s: Student) => ({
-                                                    value: s.id,
-                                                    label: `${s.studentNo} - ${s.lastName}, ${s.firstName}`,
-                                                }))}
-                                                placeholder="Select student"
-                                                className={!formCourseId ? "opacity-50 pointer-events-none w-full" : "w-full"}
-                                                isLoading={loadingStudents}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <FormField
-                                control={form.control as any}
-                                name="subjectId"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Subject *</FormLabel>
-                                        <FormControl>
-                                            <GenericCombobox
-                                                value={field.value}
-                                                onValueChange={field.onChange}
-                                                items={subjectOptions}
-                                                placeholder="Select subject"
-                                                className={!formCourseId ? "opacity-50 pointer-events-none w-full" : "w-full"}
-                                                isLoading={loadingSubjects || loadingReservations || loadingExistingGrades}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <div className="grid grid-cols-3 gap-3">
-                                <FormField
-                                    control={form.control as any}
-                                    name="prelim"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Prelim</FormLabel>
-                                            <FormControl>
-                                                <Input
-                                                    type="number"
-                                                    step="0.01"
-                                                    min="0"
-                                                    max="100"
-                                                    placeholder="0-100"
-                                                    {...field}
-                                                    value={field.value ?? ""}
-                                                />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control as any}
-                                    name="midterm"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Midterm</FormLabel>
-                                            <FormControl>
-                                                <Input
-                                                    type="number"
-                                                    step="0.01"
-                                                    min="0"
-                                                    max="100"
-                                                    placeholder="0-100"
-                                                    {...field}
-                                                    value={field.value ?? ""}
-                                                />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control as any}
-                                    name="finals"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Finals</FormLabel>
-                                            <FormControl>
-                                                <Input
-                                                    type="number"
-                                                    step="0.01"
-                                                    min="0"
-                                                    max="100"
-                                                    placeholder="0-100"
-                                                    {...field}
-                                                    value={field.value ?? ""}
-                                                />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Remarks</Label>
-                                <div className="h-10 flex items-center">
-                                    {(() => {
-                                        const p = parseFloat((formPrelim as string) || "0");
-                                        const m = parseFloat((formMidterm as string) || "0");
-                                        const f = parseFloat((formFinals as string) || "0");
-                                        if (!formPrelim || !formMidterm || !formFinals) {
-                                            return (
-                                                <Badge
-                                                    variant="outline"
-                                                    className="text-[10px] uppercase font-bold px-2 py-0.5 text-zinc-400 border-zinc-200 bg-zinc-50"
-                                                >
-                                                    Pending
-                                                </Badge>
-                                            );
-                                        }
-                                        const final = (p * 0.3) + (m * 0.3) + (f * 0.4);
-                                        const status = final <= 3.0 ? "Passed" : "Failed";
-                                        return (
-                                            <Badge
-                                                variant="secondary"
-                                                className={cn(
-                                                    "text-[10px] uppercase font-bold px-2 py-0.5 border shadow-none",
-                                                    status === "Passed"
-                                                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                                        : "bg-red-50 text-red-700 border-red-200"
-                                                )}
-                                            >
-                                                {status}
-                                            </Badge>
-                                        );
-                                    })()}
-                                </div>
-                            </div>
-
-                            <DialogFooter className="pt-4">
-                                <Button type="button" variant="outline" onClick={() => setAddOpen(false)} disabled={isCreating}>
-                                    Cancel
-                                </Button>
-                                <Button type="submit" disabled={isCreating}>
-                                    {isCreating ? (
-                                        <>
-                                            <IconLoader2 className="size-4 mr-2 animate-spin" />
-                                            {isEditing ? "Updating..." : "Creating..."}
-                                        </>
-                                    ) : (
-                                        isEditing ? "Update Grade" : "Save Grade"
-                                    )}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </Form>
-                </DialogContent>
-            </Dialog>
+            {/* Add/Edit Grade Dialog */}
+            <GradeForm
+                open={addOpen}
+                onOpenChange={setAddOpen}
+                onSubmit={onSubmit}
+                defaultValues={defaultValues}
+                isSubmitting={createMutation.isPending}
+            />
         </div>
     );
 }

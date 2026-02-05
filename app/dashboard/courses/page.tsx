@@ -1,13 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { coursesApi } from "@/lib/api";
-import { courseSchema, type CourseFormValues } from "@/lib/validations/course";
+import { type CourseFormValues } from "@/lib/validations/course";
 import { usePageTitle } from "../layout";
 import { useAuth } from "@/context/auth-context";
 import { toast } from "sonner";
@@ -29,34 +27,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-} from "@/components/ui/form";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { IconPlus, IconDotsVertical, IconPencil, IconTrash, IconUsers, IconBook, IconLoader2, IconSearch, IconX, IconChevronUp, IconChevronDown, IconSelector, IconExclamationCircle } from "@tabler/icons-react";
@@ -70,7 +42,7 @@ import {
 } from "@tanstack/react-table";
 import { cn } from "@/lib/utils";
 import { GenericDataTable } from "@/components/generic-data-table";
-import { CourseCodeCombobox, COMMON_COURSES } from "@/components/course-code-combobox";
+import { CourseForm } from "@/components/course-form";
 import {
     Pagination,
     PaginationContent,
@@ -238,16 +210,6 @@ export default function CoursesPage() {
         };
     }, [courses, selectedIds]);
 
-    // React Hook Form with Zod
-    const form = useForm<CourseFormValues>({
-        resolver: zodResolver(courseSchema),
-        defaultValues: {
-            code: "",
-            name: "",
-            description: "",
-        },
-    });
-
     useEffect(() => {
         setTitle("Course Management");
     }, [setTitle]);
@@ -262,27 +224,15 @@ export default function CoursesPage() {
         }
     }, [searchParams, formOpen, router]);
 
-    // Validation state
-    const [checkingCode, setCheckingCode] = useState(false);
-    const [codeExists, setCodeExists] = useState(false);
-
     function handleCreate() {
         setSelectedCourse(null);
-        form.reset({ code: "", name: "", description: "" });
         setFormMode("create");
-        setCodeExists(false);
         setFormOpen(true);
     }
 
     function handleEdit(course: Course) {
         setSelectedCourse(course);
-        form.reset({
-            code: course.code,
-            name: course.name,
-            description: course.description || "",
-        });
         setFormMode("edit");
-        setCodeExists(false);
         setFormOpen(true);
     }
 
@@ -292,24 +242,6 @@ export default function CoursesPage() {
     }
 
     async function onSubmit(data: CourseFormValues) {
-        if (formMode === "create") {
-            setCheckingCode(true);
-            try {
-                const check = await coursesApi.checkCode(data.code);
-                if (check.exists) {
-                    toast.error("Course code already exists", {
-                        description: `A course with code "${data.code}" is already in the system.`,
-                    });
-                    setCheckingCode(false);
-                    return;
-                }
-            } catch (err) {
-                // Ignore check errors and proceed to let backend handle it
-            } finally {
-                setCheckingCode(false);
-            }
-        }
-
         await mutation.mutateAsync({
             mode: formMode,
             data,
@@ -326,11 +258,18 @@ export default function CoursesPage() {
         await bulkDeleteMutation.mutateAsync({ ids: selectedIds, force: isForceDelete });
     }
 
+    const areAllSelected = courses.length > 0 && courses.every(c => selectedIds.includes(c.id));
+    const isAnySelected = courses.length > 0 && courses.some(c => selectedIds.includes(c.id));
+
     function toggleAllRowSelection() {
-        if (selectedIds.length === courses.length && courses.length > 0) {
-            setSelectedIds([]);
+        if (areAllSelected) {
+            // Deselect all on current page
+            const currentIds = courses.map(c => c.id);
+            setSelectedIds(prev => prev.filter(id => !currentIds.includes(id)));
         } else {
-            setSelectedIds(courses.map(c => c.id));
+            // Select all on current page
+            const currentIds = courses.map(c => c.id);
+            setSelectedIds(prev => Array.from(new Set([...prev, ...currentIds])));
         }
     }
 
@@ -371,7 +310,7 @@ export default function CoursesPage() {
                     header: ({ table }) => (
                         user?.role === "admin" ? (
                             <Checkbox
-                                checked={selectedIds.length === courses.length && courses.length > 0}
+                                checked={areAllSelected ? true : isAnySelected ? "indeterminate" : false}
                                 onCheckedChange={() => toggleAllRowSelection()}
                                 aria-label="Select all"
                             />
@@ -455,8 +394,8 @@ export default function CoursesPage() {
                         return (
                             <div className="text-right">
                                 <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="size-8">
+                                    <DropdownMenuTrigger asChild disabled={selectedIds.length > 0}>
+                                        <Button variant="ghost" size="icon" className="size-8" disabled={selectedIds.length > 0}>
                                             <IconDotsVertical className="size-4" />
                                         </Button>
                                     </DropdownMenuTrigger>
@@ -566,7 +505,7 @@ export default function CoursesPage() {
                                 Delete ({selectedIds.length})
                             </Button>
                         )}
-                        {user?.role === "admin" && (
+                        {user?.role === "admin" && selectedIds.length === 0 && (
                             <Button onClick={handleCreate} className="gap-2">
                                 <IconPlus className="size-4" />
                                 Add Course
@@ -719,286 +658,153 @@ export default function CoursesPage() {
             </div>
 
             {/* Create/Edit Dialog with React Hook Form */}
-            <Dialog open={formOpen} onOpenChange={setFormOpen}>
-                <DialogContent className="sm:max-w-[500px]" onOpenAutoFocus={(e) => e.preventDefault()}>
-                    <DialogHeader>
-                        <DialogTitle className="text-xl font-bold">
-                            {formMode === "create" ? "Add New Course" : "Edit Course"}
-                        </DialogTitle>
-                        <DialogDescription>
-                            {formMode === "create"
-                                ? "Fill in the details below to create a new course."
-                                : "Update the course information below."}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                            <FormField
-                                control={form.control}
-                                name="code"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Course Code *</FormLabel>
-                                        <FormControl>
-                                            <CourseCodeCombobox
-                                                value={field.value}
-                                                onValueChange={(code, name) => {
-                                                    field.onChange(code);
-                                                    const currentName = form.getValues("name");
-                                                    const isNameFromKnownCourse = COMMON_COURSES.some(c => c.name === currentName);
-
-                                                    if (name) {
-                                                        // Known course - auto-fill the name if empty or was previously auto-filled
-                                                        if (!currentName || isNameFromKnownCourse) {
-                                                            form.setValue("name", name);
-                                                        }
-                                                    } else if (isNameFromKnownCourse) {
-                                                        // Custom code but name still shows a known course name - clear it
-                                                        form.setValue("name", "");
-                                                    }
-
-                                                    // Real-time check if code exists (only in create mode)
-                                                    if (formMode === "create" && code.trim().length >= 2) {
-                                                        coursesApi.checkCode(code).then(res => {
-                                                            setCodeExists(!!res.exists);
-                                                        }).catch(() => { });
-                                                    } else {
-                                                        setCodeExists(false);
-                                                    }
-                                                }}
-                                                placeholder="Select or type course code..."
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                        {codeExists && (
-                                            <p className="text-[11px] font-medium text-red-500 mt-1 flex items-center gap-1">
-                                                <IconExclamationCircle className="size-3" />
-                                                This course code is already registered in the system.
-                                            </p>
-                                        )}
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="name"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Course Name *</FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                placeholder="e.g., Bachelor of Science in Computer Science"
-                                                {...field}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="description"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Description</FormLabel>
-                                        <FormControl>
-                                            <Textarea
-                                                placeholder="Optional course description..."
-                                                rows={3}
-                                                {...field}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <DialogFooter className="pt-4">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setFormOpen(false)}
-                                    disabled={isSubmitting || checkingCode}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button type="submit" disabled={isSubmitting || checkingCode || codeExists} className="min-w-[100px]">
-                                    {isSubmitting || checkingCode ? (
-                                        <>
-                                            <IconLoader2 className="size-4 mr-2 animate-spin" />
-                                            {checkingCode ? "Checking..." : (formMode === "create" ? "Creating..." : "Saving...")}
-                                        </>
-                                    ) : (
-                                        formMode === "create" ? "Create Course" : "Save Changes"
-                                    )}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </Form>
-                </DialogContent>
-            </Dialog>
+            {/* Create/Edit Dialog */}
+            <CourseForm
+                open={formOpen}
+                onOpenChange={setFormOpen}
+                onSubmit={onSubmit}
+                defaultValues={selectedCourse ? {
+                    code: selectedCourse.code,
+                    name: selectedCourse.name,
+                    description: selectedCourse.description || ""
+                } : undefined}
+                mode={formMode}
+                isSubmitting={isSubmitting}
+            />
 
             {/* Delete Dialog */}
-            <AlertDialog open={deleteOpen} onOpenChange={(open) => {
-                setDeleteOpen(open);
-                if (!open) {
-                    setIsForceDelete(false);
+            <ConfirmDialog
+                open={deleteOpen}
+                onOpenChange={(open) => {
+                    setDeleteOpen(open);
+                    if (!open) setIsForceDelete(false);
+                }}
+                title="Delete Course"
+                description={
+                    <span>
+                        Are you sure you want to delete <span className="font-semibold text-zinc-900">{courseToDelete?.name}</span>?
+                    </span>
                 }
-            }}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Course</AlertDialogTitle>
-                        <AlertDialogDescription className="space-y-4">
-                            <div className="text-zinc-600 text-sm">
-                                Are you sure you want to delete <span className="font-semibold text-zinc-900">{courseToDelete?.name}</span>?
-                            </div>
-
-                            {(courseToDelete?._count?.students ?? 0) > 0 || (courseToDelete?._count?.subjects ?? 0) > 0 ? (
-                                <>
-                                    {!isForceDelete && (
-                                        <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-amber-800 text-xs flex items-start gap-2">
-                                            <IconExclamationCircle className="size-4 shrink-0 mt-0.5" />
-                                            <div>
-                                                <p className="font-semibold mb-1">Course has active students or subjects</p>
-                                                <p>Standard deletion will fail because this course is in use.</p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="flex items-center space-x-2 pt-2 pb-1">
-                                        <Checkbox
-                                            id="force-delete-single"
-                                            checked={isForceDelete}
-                                            onCheckedChange={(checked) => setIsForceDelete(!!checked)}
-                                        />
-                                        <label
-                                            htmlFor="force-delete-single"
-                                            className="text-xs font-medium leading-none cursor-pointer select-none text-zinc-700"
-                                        >
-                                            Force delete (Auto-unenroll students & remove subjects)
-                                        </label>
-                                    </div>
-
-                                    {isForceDelete && (
-                                        <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-red-800 text-xs flex items-start gap-2">
-                                            <IconExclamationCircle className="size-4 shrink-0 mt-0.5" />
-                                            <div>
-                                                <p className="font-bold mb-1 underline">WARNING: Data will be affected</p>
-                                                <p>Students will be <span className="font-semibold">unenrolled</span> (not deleted). Subjects and grades under this course will be permanently removed.</p>
-                                            </div>
-                                        </div>
-                                    )}
-                                </>
-                            ) : (
-                                <div className="text-red-600 font-medium text-sm">This action cannot be undone.</div>
-                            )}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={(e) => {
-                                e.preventDefault();
-                                handleDelete();
-                            }}
-                            disabled={isDeleting || (!isForceDelete && ((courseToDelete?._count?.students ?? 0) > 0 || (courseToDelete?._count?.subjects ?? 0) > 0))}
-                            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
-                        >
-                            {isDeleting ? (
-                                <>
-                                    <IconLoader2 className="size-4 mr-2 animate-spin" />
-                                    Deleting...
-                                </>
-                            ) : (
-                                "Delete Course"
-                            )}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
-            {/* Bulk Delete Dialog */}
-            <AlertDialog open={bulkDeleteOpen} onOpenChange={(open) => {
-                setBulkDeleteOpen(open);
-                if (!open) {
-                    setIsForceDelete(false);
-                }
-            }}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Multiple Courses</AlertDialogTitle>
-                        <AlertDialogDescription className="space-y-4">
-                            <div className="text-zinc-600 text-sm">
-                                You have selected <span className="font-bold text-zinc-900">{selectionSummary.totalSelected}</span> courses.
-                            </div>
-
-                            {!isForceDelete && selectionSummary.withDeps > 0 && (
+                confirmText={isDeleting ? "Deleting..." : "Delete Course"}
+                variant="destructive"
+                isLoading={isDeleting}
+                disabled={!isForceDelete && ((courseToDelete?._count?.students ?? 0) > 0 || (courseToDelete?._count?.subjects ?? 0) > 0)}
+                onConfirm={(e) => {
+                    e.preventDefault();
+                    handleDelete();
+                }}
+            >
+                <div className="space-y-4 py-2">
+                    {((courseToDelete?._count?.students ?? 0) > 0 || (courseToDelete?._count?.subjects ?? 0) > 0) && (
+                        <>
+                            {!isForceDelete && (
                                 <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-amber-800 text-xs flex items-start gap-2">
                                     <IconExclamationCircle className="size-4 shrink-0 mt-0.5" />
                                     <div>
-                                        <p className="font-semibold mb-1">{selectionSummary.withDeps} courses cannot be deleted</p>
-                                        <p>These courses have active students or subjects. They will be automatically skipped.</p>
+                                        <p className="font-semibold mb-1">Course has active students or subjects</p>
+                                        <p>Standard deletion will fail because this course is in use.</p>
                                     </div>
                                 </div>
                             )}
 
-                            {selectionSummary.withDeps > 0 && (
-                                <div className="flex items-center space-x-2 pt-2 pb-1">
-                                    <Checkbox
-                                        id="force-delete-bulk"
-                                        checked={isForceDelete}
-                                        onCheckedChange={(checked) => setIsForceDelete(!!checked)}
-                                    />
-                                    <label
-                                        htmlFor="force-delete-bulk"
-                                        className="text-xs font-medium leading-none cursor-pointer select-none text-zinc-700"
-                                    >
-                                        Force delete (Auto-unenroll students & remove subjects)
-                                    </label>
-                                </div>
-                            )}
+                            <div className="flex items-center space-x-2 pt-2 pb-1">
+                                <Checkbox
+                                    id="force-delete-single"
+                                    checked={isForceDelete}
+                                    onCheckedChange={(checked) => setIsForceDelete(!!checked)}
+                                />
+                                <label
+                                    htmlFor="force-delete-single"
+                                    className="text-xs font-medium leading-none cursor-pointer select-none text-zinc-700"
+                                >
+                                    Force delete (Auto-unenroll students & remove subjects)
+                                </label>
+                            </div>
 
                             {isForceDelete && (
                                 <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-red-800 text-xs flex items-start gap-2">
                                     <IconExclamationCircle className="size-4 shrink-0 mt-0.5" />
                                     <div>
                                         <p className="font-bold mb-1 underline">WARNING: Data will be affected</p>
-                                        <p>Students will be <span className="font-semibold">unenrolled</span> (not deleted). Subjects and grades associated with these courses will be permanently removed.</p>
+                                        <p>Students will be <span className="font-semibold">unenrolled</span> (not deleted). Subjects and grades under this course will be permanently removed.</p>
                                     </div>
                                 </div>
                             )}
+                        </>
+                    )}
+                    <div className="text-red-600 font-medium text-sm">This action cannot be undone.</div>
+                </div>
+            </ConfirmDialog>
 
-                            <div className="text-zinc-600 text-sm leading-relaxed">
-                                {isForceDelete ? (
-                                    <>Are you sure you want to delete <span className="font-bold text-red-600">ALL {selectionSummary.totalSelected}</span> selected courses?</>
-                                ) : (
-                                    <>Are you sure you want to delete the remaining <span className="font-bold text-red-600">{selectionSummary.deletable}</span> courses?</>
-                                )}
-                                <p className="mt-1 font-medium text-red-500">This action cannot be undone.</p>
+            {/* Bulk Delete Dialog */}
+            <ConfirmDialog
+                open={bulkDeleteOpen}
+                onOpenChange={(open) => {
+                    setBulkDeleteOpen(open);
+                    if (!open) setIsForceDelete(false);
+                }}
+                title="Delete Multiple Courses"
+                description={
+                    <span>
+                        You have selected <span className="font-bold text-zinc-900">{selectionSummary.totalSelected}</span> courses.
+                    </span>
+                }
+                confirmText={bulkDeleteMutation.isPending ? "Deleting..." : `Delete ${isForceDelete ? selectionSummary.totalSelected : selectionSummary.deletable} Courses`}
+                variant="destructive"
+                isLoading={bulkDeleteMutation.isPending}
+                disabled={bulkDeleteMutation.isPending || (!isForceDelete && selectionSummary.deletable === 0)}
+                onConfirm={(e) => {
+                    e.preventDefault();
+                    handleBulkDelete();
+                }}
+            >
+                <div className="space-y-4 py-2">
+                    {!isForceDelete && selectionSummary.withDeps > 0 && (
+                        <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-amber-800 text-xs flex items-start gap-2">
+                            <IconExclamationCircle className="size-4 shrink-0 mt-0.5" />
+                            <div>
+                                <p className="font-semibold mb-1">{selectionSummary.withDeps} courses cannot be deleted</p>
+                                <p>These courses have active students or subjects. They will be automatically skipped.</p>
                             </div>
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={bulkDeleteMutation.isPending}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={(e) => {
-                                e.preventDefault();
-                                handleBulkDelete();
-                            }}
-                            disabled={bulkDeleteMutation.isPending || (!isForceDelete && selectionSummary.deletable === 0)}
-                            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
-                        >
-                            {bulkDeleteMutation.isPending ? (
-                                <>
-                                    <IconLoader2 className="size-4 mr-2 animate-spin" />
-                                    Deleting...
-                                </>
-                            ) : (
-                                `Delete ${isForceDelete ? selectionSummary.totalSelected : selectionSummary.deletable} Courses`
-                            )}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                        </div>
+                    )}
+
+                    {selectionSummary.withDeps > 0 && (
+                        <div className="flex items-center space-x-2 pt-2 pb-1">
+                            <Checkbox
+                                id="force-delete-bulk"
+                                checked={isForceDelete}
+                                onCheckedChange={(checked) => setIsForceDelete(!!checked)}
+                            />
+                            <label
+                                htmlFor="force-delete-bulk"
+                                className="text-xs font-medium leading-none cursor-pointer select-none text-zinc-700"
+                            >
+                                Force delete (Auto-unenroll students & remove subjects)
+                            </label>
+                        </div>
+                    )}
+
+                    {isForceDelete && (
+                        <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-red-800 text-xs flex items-start gap-2">
+                            <IconExclamationCircle className="size-4 shrink-0 mt-0.5" />
+                            <div>
+                                <p className="font-bold mb-1 underline">WARNING: Data will be affected</p>
+                                <p>Students will be <span className="font-semibold">unenrolled</span> (not deleted). Subjects and grades associated with these courses will be permanently removed.</p>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="text-zinc-600 text-sm leading-relaxed">
+                        {isForceDelete ? (
+                            <>Are you sure you want to delete <span className="font-bold text-red-600">ALL {selectionSummary.totalSelected}</span> selected courses?</>
+                        ) : (
+                            <>Are you sure you want to delete the remaining <span className="font-bold text-red-600">{selectionSummary.deletable}</span> courses?</>
+                        )}
+                        <p className="mt-1 font-medium text-red-500">This action cannot be undone.</p>
+                    </div>
+                </div>
+            </ConfirmDialog>
         </div>
     );
 }
