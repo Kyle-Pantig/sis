@@ -147,6 +147,10 @@ export default function CoursesPage() {
         onSuccess: (data, variables) => {
             toast.success(`Course ${variables.mode === "create" ? "created" : "updated"} successfully`);
             queryClient.invalidateQueries({ queryKey: ["courses"] });
+            // Also invalidate dashboard stats
+            queryClient.invalidateQueries({ queryKey: ["summary-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["course-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["courses-list"] });
             setFormOpen(false);
         },
         onError: (error: any) => {
@@ -159,6 +163,10 @@ export default function CoursesPage() {
         onSuccess: () => {
             toast.success("Course deleted successfully");
             queryClient.invalidateQueries({ queryKey: ["courses"] });
+            // Also invalidate dashboard and course list stats
+            queryClient.invalidateQueries({ queryKey: ["summary-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["course-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["courses-list"] });
             setDeleteOpen(false);
             setIsForceDelete(false);
         },
@@ -180,6 +188,10 @@ export default function CoursesPage() {
                 });
             }
             queryClient.invalidateQueries({ queryKey: ["courses"] });
+            // Also invalidate dashboard and course list stats
+            queryClient.invalidateQueries({ queryKey: ["summary-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["course-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["courses-list"] });
             setSelectedIds([]);
             setBulkDeleteOpen(false);
             setIsForceDelete(false);

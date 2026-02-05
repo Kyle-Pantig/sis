@@ -143,6 +143,10 @@ export default function StudentsPage() {
         onSuccess: (data, variables) => {
             toast.success(`Student ${variables.mode === "create" ? "created" : "updated"} successfully`);
             queryClient.invalidateQueries({ queryKey: ["students"] });
+            // Also invalidate dashboard stats (for new students or course changes)
+            queryClient.invalidateQueries({ queryKey: ["summary-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["course-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["recent-students"] });
             setFormOpen(false);
         },
         onError: (error: any) => {
@@ -171,6 +175,10 @@ export default function StudentsPage() {
         onSuccess: () => {
             toast.success("Student deleted successfully");
             queryClient.invalidateQueries({ queryKey: ["students"] });
+            // Also invalidate dashboard stats
+            queryClient.invalidateQueries({ queryKey: ["summary-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["course-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["recent-students"] });
             setDeleteOpen(false);
         },
         onError: (error: any) => {
@@ -183,6 +191,10 @@ export default function StudentsPage() {
         onSuccess: (result: any) => {
             toast.success(`Deleted ${result.count} students`);
             queryClient.invalidateQueries({ queryKey: ["students"] });
+            // Also invalidate dashboard stats
+            queryClient.invalidateQueries({ queryKey: ["summary-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["course-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["recent-students"] });
             setSelectedIds([]);
             setBulkDeleteOpen(false);
         },
@@ -553,6 +565,10 @@ export default function StudentsPage() {
                                 description="Upload a CSV file to bulk import students. Download the template to see the correct format."
                                 onSuccess={() => {
                                     queryClient.invalidateQueries({ queryKey: ["students"] });
+                                    // Also invalidate dashboard stats
+                                    queryClient.invalidateQueries({ queryKey: ["summary-stats"] });
+                                    queryClient.invalidateQueries({ queryKey: ["course-stats"] });
+                                    queryClient.invalidateQueries({ queryKey: ["recent-students"] });
                                 }}
                                 trigger={
                                     <Button variant="outline" className="gap-2">
