@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
 import * as React from "react";
+import { ChevronDownIcon } from "lucide-react";
 
 interface Course {
     id: string;
@@ -136,6 +137,9 @@ export function CourseCombobox({
                             </React.Fragment>
                         )}
                     </ComboboxValue>
+                    <div className="flex items-center shrink-0 ml-auto pr-2">
+                        <ChevronDownIcon className="size-4 text-zinc-400" />
+                    </div>
                 </ComboboxChips>
             ) : (
                 <ComboboxInput
@@ -143,6 +147,7 @@ export function CourseCombobox({
                     className={className}
                     showClear={showClear}
                     leftIcon={leftIcon}
+                    showTrigger={true}
                 />
             )}
 
