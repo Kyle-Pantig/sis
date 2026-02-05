@@ -4,12 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { authApi } from "@/lib/api";
 import { useRouter, usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-
-interface User {
-    id: string;
-    email: string;
-    role: "admin" | "encoder";
-}
+import { User } from "@/types";
 
 interface AuthContextType {
     user: User | null;
