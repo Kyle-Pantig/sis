@@ -78,7 +78,7 @@ export function GradeForm({
     const isSubmitting = externalIsSubmitting ?? internalIsSubmitting;
 
     const form = useForm<GradeFormValues>({
-        resolver: zodResolver(gradeSchema),
+        resolver: zodResolver(gradeSchema) as any,
         defaultValues: {
             studentId: "",
             subjectId: "",
@@ -305,9 +305,6 @@ export function GradeForm({
                                             items={subjectOptions}
                                             placeholder="Select subject"
                                             className={!formCourseId && !formStudentId ? "opacity-50 pointer-events-none w-full" : "w-full"} // Logic tweak: Need student or course? Original was !formCourseId. But if I select student without course filter?
-                                            // Actually fetching requires courseId for subjects list? No, subjects-list uses formCourseId. If null, fetches all?
-                                            // Original: disabled if !formCourseId. Let's keep that safely or improve.
-                                            // Actually student selection implies course usually. 
                                             isLoading={loadingSubjects || loadingReservations || loadingExistingGrades}
                                         />
                                     </FormControl>

@@ -14,7 +14,7 @@ export const courseSchema = z.object({
         .string()
         .max(500, "Description must be at most 500 characters")
         .optional()
-        .or(z.literal("")),
+        .transform(val => val || ""),
 });
 
 export type CourseFormValues = z.infer<typeof courseSchema>;

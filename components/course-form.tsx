@@ -52,7 +52,7 @@ export function CourseForm({
     const [codeExists, setCodeExists] = useState(false);
 
     const form = useForm<CourseFormValues>({
-        resolver: zodResolver(courseSchema),
+        resolver: zodResolver(courseSchema) as any,
         defaultValues: {
             code: "",
             name: "",

@@ -55,7 +55,7 @@ export function SubjectForm({
     const [titleExists, setTitleExists] = useState(false);
 
     const form = useForm<SubjectFormValues>({
-        resolver: zodResolver(subjectSchema),
+        resolver: zodResolver(subjectSchema) as any,
         defaultValues: {
             courseId: "",
             code: "",
@@ -79,6 +79,8 @@ export function SubjectForm({
     }, [open, defaultValues, form]);
 
     const checkAvailability = async (codeValue?: string, titleValue?: string, courseIdValue?: string) => {
+        if (mode === "edit") return;
+
         const cId = courseIdValue || form.getValues("courseId");
         const code = codeValue !== undefined ? codeValue : form.getValues("code");
         const title = titleValue !== undefined ? titleValue : form.getValues("title");
@@ -102,36 +104,33 @@ export function SubjectForm({
     };
 
     async function handleFormSubmit(data: SubjectFormValues) {
-        setCheckingAvailability(true);
-        try {
-            const res = await subjectsApi.checkAvailability(
-                data.courseId,
-                data.code,
-                data.title,
-                subjectId
-            );
+        if (mode === "create") {
+            setCheckingAvailability(true);
+            try {
+                const res = await subjectsApi.checkAvailability(
+                    data.courseId,
+                    data.code,
+                    data.title,
+                    subjectId
+                );
 
-            if (res.codeExists) {
-                setCodeExists(true);
-                toast.error("Subject code already exists for this course");
-                setCheckingAvailability(false);
-                return;
-            }
+                if (res.codeExists) {
+                    setCodeExists(true);
+                    toast.error("Subject code already exists for this course");
+                    setCheckingAvailability(false);
+                    return;
+                }
 
-            if (res.titleExists) {
-                setTitleExists(true);
-                toast.error("Subject title already exists for this course");
+                if (res.titleExists) {
+                    setTitleExists(true);
+                    toast.error("Subject title already exists for this course");
+                    setCheckingAvailability(false);
+                    return;
+                }
+            } catch (error) {
+            } finally {
                 setCheckingAvailability(false);
-                return;
             }
-        } catch (error) {
-            // If check fails, we proceed? Or stop? 
-            // Original code: "If check fails, we might want to continue or show error" but it continued in finally block?
-            // Actually original code had the check inside try/catch, and mutation outside.
-            // If check threw error, mutation would run.
-            // But if res.codeExists was true, it returned early.
-        } finally {
-            setCheckingAvailability(false);
         }
 
         // Double check state before submitting
