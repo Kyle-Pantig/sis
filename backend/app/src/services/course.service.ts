@@ -111,9 +111,10 @@ export class CourseService {
                     where: { courseId: id },
                 });
 
-                // 5. Delete all students in this course
-                await tx.student.deleteMany({
+                // 5. Unenroll all students (set courseId to null instead of deleting)
+                await tx.student.updateMany({
                     where: { courseId: id },
+                    data: { courseId: null },
                 });
 
                 // 6. Finally delete the course
@@ -171,9 +172,10 @@ export class CourseService {
                     where: { courseId: { in: ids } },
                 });
 
-                // 5. Delete all students
-                await tx.student.deleteMany({
+                // 5. Unenroll all students (set courseId to null instead of deleting)
+                await tx.student.updateMany({
                     where: { courseId: { in: ids } },
+                    data: { courseId: null },
                 });
 
                 // 6. Delete courses

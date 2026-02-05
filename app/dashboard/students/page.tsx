@@ -80,12 +80,12 @@ interface Student {
     lastName: string;
     email: string;
     birthDate: string;
-    courseId: string;
+    courseId: string | null;
     course: {
         id: string;
         code: string;
         name: string;
-    };
+    } | null;
 }
 
 interface PaginatedStudents {
@@ -359,9 +359,15 @@ export default function StudentsPage() {
                 accessorKey: "course.code",
                 header: "Course",
                 cell: ({ row }) => (
-                    <Badge variant="outline" className="bg-zinc-100 text-[10px] font-bold text-zinc-600 border-none px-2 py-0.5">
-                        {row.original.course.code}
-                    </Badge>
+                    row.original.course ? (
+                        <Badge variant="outline" className="bg-zinc-100 text-[10px] font-bold text-zinc-600 border-none px-2 py-0.5">
+                            {row.original.course.code}
+                        </Badge>
+                    ) : (
+                        <Badge variant="outline" className="bg-amber-50 text-[10px] font-bold text-amber-600 border-amber-200 px-2 py-0.5">
+                            Unenrolled
+                        </Badge>
+                    )
                 ),
             },
             {
@@ -535,7 +541,7 @@ export default function StudentsPage() {
                                     return result;
                                 }}
                                 templateColumns={[
-                                    { key: "studentNo", label: "Student No", required: true },
+                                    { key: "studentNo", label: "Student No (Optional)", required: false },
                                     { key: "firstName", label: "First Name", required: true },
                                     { key: "lastName", label: "Last Name", required: true },
                                     { key: "email", label: "Email" },
@@ -742,7 +748,7 @@ export default function StudentsPage() {
                     lastName: selectedStudent.lastName,
                     email: selectedStudent.email || "",
                     birthDate: selectedStudent.birthDate,
-                    courseId: selectedStudent.courseId,
+                    courseId: selectedStudent.courseId || "",
                 } : undefined}
                 mode={formMode}
                 isSubmitting={isSubmitting}

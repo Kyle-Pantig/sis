@@ -1,12 +1,12 @@
 import prisma from "../db";
 
 interface CreateStudentData {
-    studentNo: string;
+    studentNo?: string;
     firstName: string;
     lastName: string;
     email?: string | null;
     birthDate: string | Date;
-    courseId: string;
+    courseId?: string | null;
 }
 
 interface UpdateStudentData {
@@ -15,8 +15,9 @@ interface UpdateStudentData {
     lastName?: string;
     email?: string | null;
     birthDate?: string | Date;
-    courseId?: string;
+    courseId?: string | null;
 }
+
 
 export class StudentService {
     static async getAllStudents(page: number = 1, limit: number = 10, search?: string, courseId?: string) {
@@ -104,15 +105,50 @@ export class StudentService {
         return await prisma.student.count();
     }
 
+    static async generateStudentNo() {
+        const currentYear = new Date().getFullYear();
+        const yearPrefix = currentYear.toString();
+
+        // Find the last student number for the current year
+        // We order by studentNo desc to get the highest one
+        const lastStudent = await prisma.student.findFirst({
+            where: {
+                studentNo: {
+                    startsWith: `${yearPrefix}-`,
+                },
+            },
+            orderBy: {
+                studentNo: "desc",
+            },
+        });
+
+        let nextSequence = 1;
+        if (lastStudent) {
+            const lastStudentNo = lastStudent.studentNo;
+            const sequencePart = lastStudentNo.split("-")[1];
+            if (sequencePart && !isNaN(parseInt(sequencePart, 10))) {
+                nextSequence = parseInt(sequencePart, 10) + 1;
+            }
+        }
+
+        const formattedSequence = nextSequence.toString().padStart(5, "0");
+        return `${yearPrefix}-${formattedSequence}`;
+    }
+
     static async createStudent(data: CreateStudentData) {
+        let studentNo = data.studentNo;
+        if (!studentNo) {
+            studentNo = await this.generateStudentNo();
+        }
+
         return await prisma.student.create({
             data: {
-                studentNo: data.studentNo,
+                studentNo: studentNo,
                 firstName: data.firstName,
                 lastName: data.lastName,
                 email: data.email || null,
                 birthDate: new Date(data.birthDate),
-                courseId: data.courseId,
+                ...(data.courseId ? { course: { connect: { id: data.courseId } } } : {}),
             },
             include: {
                 course: true,
@@ -149,62 +185,290 @@ export class StudentService {
         });
     }
 
-    static async bulkCreateStudents(students: { studentNo: string; firstName: string; lastName: string; email?: string | null; birthDate: string; course: string }[]) {
+    static async bulkCreateStudents(students: { studentNo?: string; firstName: string; lastName: string; email?: string | null; birthDate: string; course: string }[]) {
         const results = {
             success: 0,
             failed: 0,
             errors: [] as { row: number; studentNo: string; error: string }[]
         };
 
-        // Pre-load all courses for efficient lookup
-        const allCourses = await prisma.course.findMany();
+        if (students.length === 0) return results;
 
-        // Create a lookup map for courses by code and name (case-insensitive)
+        // ============ PHASE 1: Pre-load all existing data in parallel ============
+        const currentYear = new Date().getFullYear();
+        const yearPrefix = currentYear.toString();
+
+        const [allCourses, lastStudent, existingStudents] = await Promise.all([
+            // Get all courses for lookup
+            prisma.course.findMany(),
+            // Get the last student number for auto-generation
+            prisma.student.findFirst({
+                where: { studentNo: { startsWith: `${yearPrefix}-` } },
+                orderBy: { studentNo: "desc" },
+            }),
+            // Get all existing student numbers and emails to check for duplicates upfront
+            prisma.student.findMany({
+                select: { studentNo: true, email: true },
+            }),
+        ]);
+
+        // Build lookup maps
         const courseMap = new Map<string, string>();
         for (const course of allCourses) {
             courseMap.set(course.code.toLowerCase(), course.id);
             courseMap.set(course.name.toLowerCase(), course.id);
         }
 
+        const existingStudentNos = new Set(existingStudents.map(s => s.studentNo.toLowerCase()));
+        const existingEmails = new Set(existingStudents.filter(s => s.email).map(s => s.email!.toLowerCase()));
+
+        // Track sequence for auto-generation
+        let lastGeneratedSequence = 0;
+        if (lastStudent) {
+            const sequencePart = lastStudent.studentNo.split("-")[1];
+            if (sequencePart && !isNaN(parseInt(sequencePart, 10))) {
+                lastGeneratedSequence = parseInt(sequencePart, 10);
+            }
+        }
+
+        // ============ PHASE 2: Pre-process all students and collect new courses ============
+        const newCoursesToCreate = new Set<string>();
+        const processedStudents: {
+            rowIndex: number;
+            studentNo: string;
+            firstName: string;
+            lastName: string;
+            email: string | null;
+            birthDate: Date;
+            courseKey: string;
+        }[] = [];
+
+        // Track student numbers and emails being added in this batch to detect duplicates within the CSV
+        const batchStudentNos = new Set<string>();
+        const batchEmails = new Set<string>();
+
         for (let i = 0; i < students.length; i++) {
             const student = students[i];
-            try {
-                // Look up course by code or name (case-insensitive)
-                const courseKey = student.course?.toLowerCase().trim();
-                const courseId = courseMap.get(courseKey);
+            let studentNo = student.studentNo?.trim();
 
-                if (!courseId) {
-                    results.failed++;
-                    results.errors.push({
-                        row: i + 2,
-                        studentNo: student.studentNo,
-                        error: `Course not found: "${student.course}". Use course code (e.g., BSCPE) or full name.`
-                    });
-                    continue;
-                }
+            // Generate student number if not provided
+            if (!studentNo) {
+                lastGeneratedSequence++;
+                const formattedSequence = lastGeneratedSequence.toString().padStart(5, "0");
+                studentNo = `${yearPrefix}-${formattedSequence}`;
+            }
 
-                await prisma.student.create({
-                    data: {
-                        studentNo: student.studentNo,
-                        firstName: student.firstName,
-                        lastName: student.lastName,
-                        email: student.email || null,
-                        birthDate: new Date(student.birthDate),
-                        courseId: courseId,
-                    },
-                });
-                results.success++;
-            } catch (error: any) {
+            const studentNoLower = studentNo.toLowerCase();
+            const emailLower = student.email?.toLowerCase().trim() || null;
+
+            // Check for duplicate student number (in DB or within this batch)
+            if (existingStudentNos.has(studentNoLower) || batchStudentNos.has(studentNoLower)) {
                 results.failed++;
-                let errorMessage = "Unknown error";
-                if (error.code === "P2002") {
-                    errorMessage = "Student number already exists";
-                }
                 results.errors.push({
                     row: i + 2,
-                    studentNo: student.studentNo,
-                    error: errorMessage
+                    studentNo: studentNo,
+                    error: `Student number "${studentNo}" already exists`
                 });
+                continue;
+            }
+
+            // Check for duplicate email (in DB or within this batch)
+            if (emailLower && (existingEmails.has(emailLower) || batchEmails.has(emailLower))) {
+                results.failed++;
+                results.errors.push({
+                    row: i + 2,
+                    studentNo: studentNo,
+                    error: `Email "${student.email}" already exists`
+                });
+                continue;
+            }
+
+            // Validate course
+            const courseKey = student.course?.toLowerCase().trim();
+            if (!courseKey) {
+                results.failed++;
+                results.errors.push({
+                    row: i + 2,
+                    studentNo: studentNo,
+                    error: `Course is required`
+                });
+                continue;
+            }
+
+            // If course doesn't exist, mark it for creation
+            if (!courseMap.has(courseKey)) {
+                newCoursesToCreate.add(student.course.trim().toUpperCase());
+            }
+
+            // Mark as used in this batch
+            batchStudentNos.add(studentNoLower);
+            if (emailLower) batchEmails.add(emailLower);
+
+            // Add to processed list
+            processedStudents.push({
+                rowIndex: i,
+                studentNo: studentNo,
+                firstName: student.firstName.trim(),
+                lastName: student.lastName.trim(),
+                email: student.email?.trim() || null,
+                birthDate: new Date(student.birthDate),
+                courseKey: courseKey,
+            });
+        }
+
+        // ============ PHASE 3: Create any new courses (batch) ============
+        // Common Philippine course code to full name mapping
+        const courseCodeToName: Record<string, string> = {
+            // Engineering
+            "BSCPE": "Bachelor of Science in Computer Engineering",
+            "BSCE": "Bachelor of Science in Civil Engineering",
+            "BSEE": "Bachelor of Science in Electrical Engineering",
+            "BSECE": "Bachelor of Science in Electronics Engineering",
+            "BSME": "Bachelor of Science in Mechanical Engineering",
+            "BSCHE": "Bachelor of Science in Chemical Engineering",
+            "BSIE": "Bachelor of Science in Industrial Engineering",
+            // Information Technology
+            "BSIT": "Bachelor of Science in Information Technology",
+            "BSCS": "Bachelor of Science in Computer Science",
+            "BSIS": "Bachelor of Science in Information Systems",
+            // Business
+            "BSA": "Bachelor of Science in Accountancy",
+            "BSAIS": "Bachelor of Science in Accounting Information System",
+            "BSBA": "Bachelor of Science in Business Administration",
+            "BSMA": "Bachelor of Science in Management Accounting",
+            "BSHM": "Bachelor of Science in Hospitality Management",
+            "BSTM": "Bachelor of Science in Tourism Management",
+            // Education
+            "BEED": "Bachelor of Elementary Education",
+            "BSED": "Bachelor of Secondary Education",
+            "BTLED": "Bachelor of Technology and Livelihood Education",
+            // Health Sciences
+            "BSN": "Bachelor of Science in Nursing",
+            "BSMT": "Bachelor of Science in Medical Technology",
+            "BSPT": "Bachelor of Science in Physical Therapy",
+            "BSRT": "Bachelor of Science in Radiologic Technology",
+            "BSPHARMA": "Bachelor of Science in Pharmacy",
+            "BSP": "Bachelor of Science in Psychology",
+            // Arts and Sciences
+            "AB": "Bachelor of Arts",
+            "ABCOMM": "Bachelor of Arts in Communication",
+            "ABPOLSCI": "Bachelor of Arts in Political Science",
+            "ABENG": "Bachelor of Arts in English",
+            "BSCRIM": "Bachelor of Science in Criminology",
+            "BSSW": "Bachelor of Science in Social Work",
+            // Agriculture
+            "BSAGRI": "Bachelor of Science in Agriculture",
+            "BSFORESTRY": "Bachelor of Science in Forestry",
+            // Architecture
+            "BSARCH": "Bachelor of Science in Architecture",
+            // Others
+            "BSOA": "Bachelor of Science in Office Administration",
+            "BSHRM": "Bachelor of Science in Hotel and Restaurant Management",
+            "BSMLS": "Bachelor of Science in Medical Laboratory Science",
+        };
+
+        if (newCoursesToCreate.size > 0) {
+            const coursesToInsert = Array.from(newCoursesToCreate).map(code => ({
+                code: code,
+                name: courseCodeToName[code] || code, // Use full name if available, otherwise use code
+                description: courseCodeToName[code]
+                    ? `${code} - Auto-created during student import`
+                    : "Auto-created during student import",
+            }));
+
+            try {
+                await prisma.course.createMany({
+                    data: coursesToInsert,
+                    skipDuplicates: true,
+                });
+
+                // Refresh course map after creating new courses
+                const updatedCourses = await prisma.course.findMany();
+                for (const course of updatedCourses) {
+                    courseMap.set(course.code.toLowerCase(), course.id);
+                    courseMap.set(course.name.toLowerCase(), course.id);
+                }
+            } catch (error) {
+                console.error("Error creating courses:", error);
+            }
+        }
+
+        // ============ PHASE 4: Resolve course IDs and prepare final data ============
+        const studentsToCreate: {
+            studentNo: string;
+            firstName: string;
+            lastName: string;
+            email: string | null;
+            birthDate: Date;
+            courseId: string;
+        }[] = [];
+
+        for (const student of processedStudents) {
+            const courseId = courseMap.get(student.courseKey);
+            if (!courseId) {
+                results.failed++;
+                results.errors.push({
+                    row: student.rowIndex + 2,
+                    studentNo: student.studentNo,
+                    error: `Course not found: "${student.courseKey}"`
+                });
+                continue;
+            }
+
+            studentsToCreate.push({
+                studentNo: student.studentNo,
+                firstName: student.firstName,
+                lastName: student.lastName,
+                email: student.email,
+                birthDate: student.birthDate,
+                courseId: courseId,
+            });
+        }
+
+        // ============ PHASE 5: Batch insert all valid students ============
+        if (studentsToCreate.length > 0) {
+            try {
+                const result = await prisma.student.createMany({
+                    data: studentsToCreate,
+                    skipDuplicates: true, // Skip any that somehow still conflict
+                });
+                results.success = result.count;
+
+                // If some were skipped due to duplicates, calculate failures
+                const skippedCount = studentsToCreate.length - result.count;
+                if (skippedCount > 0) {
+                    results.failed += skippedCount;
+                    // Note: We can't easily identify which specific records failed with createMany
+                    // The duplicate check in Phase 2 should catch most cases
+                }
+            } catch (error: any) {
+                console.error("Bulk insert error:", error);
+                // If batch insert fails completely, fall back to individual inserts
+                // This is a safety net but shouldn't normally happen
+                for (const student of studentsToCreate) {
+                    try {
+                        await prisma.student.create({ data: student });
+                        results.success++;
+                    } catch (innerError: any) {
+                        results.failed++;
+                        let errorMessage = "Unknown error";
+                        if (innerError.code === "P2002") {
+                            const target = innerError.meta?.target;
+                            if (target?.includes("student_no") || target?.includes("studentNo")) {
+                                errorMessage = `Student number "${student.studentNo}" already exists`;
+                            } else if (target?.includes("email")) {
+                                errorMessage = `Email "${student.email}" already exists`;
+                            } else {
+                                errorMessage = "Duplicate record found";
+                            }
+                        }
+                        results.errors.push({
+                            row: 0, // We lose row info in fallback
+                            studentNo: student.studentNo,
+                            error: errorMessage
+                        });
+                    }
+                }
             }
         }
 

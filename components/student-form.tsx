@@ -117,72 +117,84 @@ export function StudentForm({
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="studentNo">Student Number *</Label>
-                            <Input
-                                id="studentNo"
-                                placeholder="e.g., 2026-00001"
-                                {...register("studentNo")}
-                                className={errors.studentNo ? "border-red-500" : ""}
-                            />
-                            {errors.studentNo && (
-                                <p className="text-xs text-red-500">{errors.studentNo.message}</p>
-                            )}
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="birthDate">Birth Date *</Label>
-                            <Input
-                                id="birthDate"
-                                type="date"
-                                {...register("birthDate")}
-                                className={errors.birthDate ? "border-red-500" : ""}
-                            />
-                            {errors.birthDate && (
-                                <p className="text-xs text-red-500">{errors.birthDate.message}</p>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="firstName">First Name *</Label>
-                            <Input
-                                id="firstName"
-                                placeholder="John"
-                                {...register("firstName")}
-                                className={errors.firstName ? "border-red-500" : ""}
-                            />
-                            {errors.firstName && (
-                                <p className="text-xs text-red-500">{errors.firstName.message}</p>
-                            )}
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="lastName">Last Name *</Label>
-                            <Input
-                                id="lastName"
-                                placeholder="Doe"
-                                {...register("lastName")}
-                                className={errors.lastName ? "border-red-500" : ""}
-                            />
-                            {errors.lastName && (
-                                <p className="text-xs text-red-500">{errors.lastName.message}</p>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="email">Email Address</Label>
-                        <Input
-                            id="email"
-                            type="email"
-                            placeholder="student@example.com"
-                            {...register("email")}
-                            className={errors.email ? "border-red-500" : ""}
-                        />
-                        {errors.email && (
-                            <p className="text-xs text-red-500">{errors.email.message}</p>
+                    <div className="space-y-4">
+                        {mode === "edit" ? (
+                            <div className="space-y-2">
+                                <Label htmlFor="studentNo">Student Number</Label>
+                                <Input
+                                    id="studentNo"
+                                    {...register("studentNo")}
+                                    readOnly
+                                    className="bg-zinc-50 border-zinc-200 text-zinc-500 font-mono cursor-not-allowed"
+                                />
+                                <p className="text-[10px] text-zinc-400">Student number cannot be modified.</p>
+                            </div>
+                        ) : (
+                            <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider">Student Number</p>
+                                    <p className="text-[11px] text-emerald-600">Generated automatically upon creation</p>
+                                </div>
+                                <div className="px-2 py-1 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase">
+                                    Auto-Gen
+                                </div>
+                            </div>
                         )}
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="birthDate">Birth Date *</Label>
+                                <Input
+                                    id="birthDate"
+                                    type="date"
+                                    {...register("birthDate")}
+                                    className={errors.birthDate ? "border-red-500" : ""}
+                                />
+                                {errors.birthDate && (
+                                    <p className="text-xs text-red-500">{errors.birthDate.message}</p>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="email">Email Address</Label>
+                                <Input
+                                    id="email"
+                                    type="email"
+                                    placeholder="student@example.com"
+                                    {...register("email")}
+                                    className={errors.email ? "border-red-500" : ""}
+                                />
+                                {errors.email && (
+                                    <p className="text-xs text-red-500">{errors.email.message}</p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="firstName">First Name *</Label>
+                                <Input
+                                    id="firstName"
+                                    placeholder="John"
+                                    {...register("firstName")}
+                                    className={errors.firstName ? "border-red-500" : ""}
+                                />
+                                {errors.firstName && (
+                                    <p className="text-xs text-red-500">{errors.firstName.message}</p>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="lastName">Last Name *</Label>
+                                <Input
+                                    id="lastName"
+                                    placeholder="Doe"
+                                    {...register("lastName")}
+                                    className={errors.lastName ? "border-red-500" : ""}
+                                />
+                                {errors.lastName && (
+                                    <p className="text-xs text-red-500">{errors.lastName.message}</p>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
                     <div className="space-y-2">

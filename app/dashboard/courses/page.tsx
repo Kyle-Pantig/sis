@@ -70,6 +70,7 @@ import {
 } from "@tanstack/react-table";
 import { cn } from "@/lib/utils";
 import { GenericDataTable } from "@/components/generic-data-table";
+import { CourseCodeCombobox, COMMON_COURSES } from "@/components/course-code-combobox";
 import {
     Pagination,
     PaginationContent,
@@ -697,10 +698,24 @@ export default function CoursesPage() {
                                     <FormItem>
                                         <FormLabel>Course Code *</FormLabel>
                                         <FormControl>
-                                            <Input
-                                                placeholder="e.g., BSCS"
-                                                {...field}
-                                                onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                            <CourseCodeCombobox
+                                                value={field.value}
+                                                onValueChange={(code, name) => {
+                                                    field.onChange(code);
+                                                    const currentName = form.getValues("name");
+                                                    const isNameFromKnownCourse = COMMON_COURSES.some(c => c.name === currentName);
+
+                                                    if (name) {
+                                                        // Known course - auto-fill the name if empty or was previously auto-filled
+                                                        if (!currentName || isNameFromKnownCourse) {
+                                                            form.setValue("name", name);
+                                                        }
+                                                    } else if (isNameFromKnownCourse) {
+                                                        // Custom code but name still shows a known course name - clear it
+                                                        form.setValue("name", "");
+                                                    }
+                                                }}
+                                                placeholder="Select or type course code..."
                                             />
                                         </FormControl>
                                         <FormMessage />
@@ -810,8 +825,8 @@ export default function CoursesPage() {
                                         <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-red-800 text-xs flex items-start gap-2">
                                             <IconExclamationCircle className="size-4 shrink-0 mt-0.5" />
                                             <div>
-                                                <p className="font-bold mb-1 underline">DANGER: PERMANENT DATA LOSS</p>
-                                                <p>This will permanently delete ALL students, subjects, and grades under this course.</p>
+                                                <p className="font-bold mb-1 underline">WARNING: Data will be affected</p>
+                                                <p>Students will be <span className="font-semibold">unenrolled</span> (not deleted). Subjects and grades under this course will be permanently removed.</p>
                                             </div>
                                         </div>
                                     )}
@@ -889,8 +904,8 @@ export default function CoursesPage() {
                                 <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-red-800 text-xs flex items-start gap-2">
                                     <IconExclamationCircle className="size-4 shrink-0 mt-0.5" />
                                     <div>
-                                        <p className="font-bold mb-1 underline">DANGER: PERMANENT DATA LOSS</p>
-                                        <p>Forcing deletion will permanently remove ALL students, subjects, and grades associated with these courses.</p>
+                                        <p className="font-bold mb-1 underline">WARNING: Data will be affected</p>
+                                        <p>Students will be <span className="font-semibold">unenrolled</span> (not deleted). Subjects and grades associated with these courses will be permanently removed.</p>
                                     </div>
                                 </div>
                             )}

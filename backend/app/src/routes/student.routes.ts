@@ -21,7 +21,7 @@ export const studentRoutes = new Elysia({ prefix: "/students" })
     })
     .post("/", (context: any) => StudentController.createStudent(context), {
         body: t.Object({
-            studentNo: t.String(),
+            studentNo: t.Optional(t.Nullable(t.String())),
             firstName: t.String(),
             lastName: t.String(),
             email: t.Optional(t.Nullable(t.String())),
@@ -44,7 +44,7 @@ export const studentRoutes = new Elysia({ prefix: "/students" })
     .post("/import", (context: any) => StudentController.importStudents(context), {
         body: t.Object({
             students: t.Array(t.Object({
-                studentNo: t.String(),
+                studentNo: t.Optional(t.Nullable(t.String())),
                 firstName: t.String(),
                 lastName: t.String(),
                 email: t.Optional(t.Nullable(t.String())),

@@ -45,7 +45,7 @@ export function CSVImportDialog({
     const downloadTemplate = () => {
         const headers = templateColumns.map(col => col.label).join(",");
         const exampleRow = templateColumns.map(col => {
-            if (col.key === "studentNo") return "2024-00001";
+            if (col.key === "studentNo") return ""; // Leave blank - it's auto-generated
             if (col.key === "firstName") return "Juan";
             if (col.key === "lastName") return "Dela Cruz";
             if (col.key === "email") return "juan@email.com";
@@ -70,14 +70,44 @@ export function CSVImportDialog({
         const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
         const data: any[] = [];
 
+        // Helper function to find header index with flexible matching
+        const findHeaderIndex = (col: { key: string; label: string }) => {
+            const key = col.key.toLowerCase();
+            const label = col.label.toLowerCase();
+
+            // Define common variations for each column
+            const variations: Record<string, string[]> = {
+                studentno: ["student no", "studentno", "student number", "student_no", "student_number", "id", "student id"],
+                firstname: ["first name", "firstname", "first_name", "given name", "fname"],
+                lastname: ["last name", "lastname", "last_name", "surname", "family name", "lname"],
+                email: ["email", "e-mail", "email address", "e-mail address"],
+                birthdate: ["birth date", "birthdate", "birth_date", "birthday", "date of birth", "dob"],
+                course: ["course", "course code", "program", "course name", "department"],
+            };
+
+            // Check exact matches first
+            let idx = headers.findIndex(h => h === label || h === key);
+            if (idx !== -1) return idx;
+
+            // Check variations
+            const keyVariations = variations[key] || [];
+            for (const variation of keyVariations) {
+                idx = headers.findIndex(h => h === variation || h.includes(variation) || variation.includes(h));
+                if (idx !== -1) return idx;
+            }
+
+            // Check if header contains or is contained by the key/label
+            idx = headers.findIndex(h => h.includes(key) || key.includes(h) || h.includes(label.split(" ")[0]));
+
+            return idx;
+        };
+
         for (let i = 1; i < lines.length; i++) {
             const values = lines[i].split(",").map(v => v.trim());
             const row: any = {};
 
-            templateColumns.forEach((col, idx) => {
-                const headerIdx = headers.findIndex(h =>
-                    h === col.label.toLowerCase() || h === col.key.toLowerCase()
-                );
+            templateColumns.forEach((col) => {
+                const headerIdx = findHeaderIndex(col);
                 if (headerIdx !== -1 && values[headerIdx] !== undefined) {
                     row[col.key] = values[headerIdx] || null;
                 }
@@ -157,22 +187,33 @@ export function CSVImportDialog({
             const result = await onImport(parsedData);
             setImportResult(result);
 
-            if (result.success > 0) {
+            if (result.success > 0 && result.failed === 0) {
                 toast.success(`Successfully imported ${result.success} records`);
-            }
-            if (result.failed > 0) {
-                toast.error(`Failed to import ${result.failed} records`);
+            } else if (result.success > 0 && result.failed > 0) {
+                toast.info(`Imported ${result.success} records, ${result.failed} skipped`);
+            } else if (result.failed > 0) {
+                toast.info(`${result.failed} records were skipped`);
             }
 
-            if (result.failed === 0 && onSuccess) {
+            // Refresh the table whenever any records are imported
+            if (result.success > 0 && onSuccess) {
                 onSuccess();
+            }
+
+            // Only auto-close dialog when all records succeed
+            if (result.failed === 0 && result.success > 0) {
                 setTimeout(() => {
                     setOpen(false);
                     resetState();
                 }, 1500);
             }
         } catch (error: any) {
-            toast.error(error.message || "Import failed");
+            console.error("Import error:", error);
+            setImportResult({
+                success: 0,
+                failed: parsedData.length,
+                errors: [{ row: 0, studentNo: "", error: error.message || "An unexpected error occurred during import" }]
+            });
         } finally {
             setIsImporting(false);
         }
@@ -268,37 +309,60 @@ export function CSVImportDialog({
                         </label>
                     </div>
 
-                    {/* Import Result */}
+                    {/* Import Result Summary */}
                     {importResult && (
-                        <div className={cn(
-                            "p-4 rounded-lg border",
-                            importResult.failed === 0 ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"
-                        )}>
-                            <div className="flex items-center gap-4 text-sm">
-                                <div className="flex items-center gap-1 text-emerald-700">
-                                    <IconCheck className="size-4" />
-                                    <span>{importResult.success} imported</span>
-                                </div>
-                                {importResult.failed > 0 && (
-                                    <div className="flex items-center gap-1 text-red-700">
-                                        <IconX className="size-4" />
-                                        <span>{importResult.failed} failed</span>
+                        <div className="space-y-3 pt-2">
+                            <div className="flex items-center justify-between px-1">
+                                <h4 className="text-[11px] font-bold uppercase tracking-widest text-zinc-400">Import Summary</h4>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+                                        <div className="size-1.5 rounded-full bg-emerald-500" />
+                                        {importResult.success} Success
                                     </div>
-                                )}
-                            </div>
-                            {importResult.errors && importResult.errors.length > 0 && (
-                                <div className="mt-3 max-h-32 overflow-y-auto">
-                                    <p className="text-xs font-medium text-zinc-700 mb-1">Errors:</p>
-                                    {importResult.errors.slice(0, 5).map((err, idx) => (
-                                        <p key={idx} className="text-xs text-red-600">
-                                            Row {err.row} ({err.studentNo}): {err.error}
-                                        </p>
-                                    ))}
-                                    {importResult.errors.length > 5 && (
-                                        <p className="text-xs text-zinc-500">...and {importResult.errors.length - 5} more</p>
+                                    {importResult.failed > 0 && (
+                                        <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+                                            <div className="size-1.5 rounded-full bg-zinc-300" />
+                                            {importResult.failed} Skipped
+                                        </div>
                                     )}
                                 </div>
-                            )}
+                            </div>
+
+                            <div className="rounded-xl border border-zinc-100 bg-white overflow-hidden">
+                                <div className="max-h-[180px] overflow-y-auto divide-y divide-zinc-50 custom-scrollbar">
+                                    {/* Success Items (Subtle) */}
+                                    {importResult.success > 0 && (
+                                        <div className="px-4 py-2.5 bg-zinc-50/30 flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <div className="size-5 rounded-full bg-emerald-50 flex items-center justify-center">
+                                                    <IconCheck className="size-3 text-emerald-600" />
+                                                </div>
+                                                <span className="text-xs font-medium text-zinc-600">{importResult.success} records processed successfully</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Skipped Items (Minimal Error Display) */}
+                                    {importResult.errors && importResult.errors.map((err, idx) => (
+                                        <div key={idx} className="px-4 py-3 flex items-start gap-3 hover:bg-zinc-50/50 transition-colors">
+                                            <div className="size-5 rounded-full bg-zinc-100 flex items-center justify-center shrink-0 mt-0.5">
+                                                <IconX className="size-3 text-zinc-500" />
+                                            </div>
+                                            <div className="space-y-0.5">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tight">Row {err.row}</span>
+                                                    <span className="text-[10px] font-mono font-bold text-zinc-900 px-1.5 py-0.5 bg-zinc-100 rounded uppercase">
+                                                        {err.studentNo || "GENERATED"}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-zinc-500 font-medium leading-relaxed">
+                                                    {err.error.replace("Student number already exists", "Record already exists in the system")}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
