@@ -66,8 +66,13 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ListFilter } from "lucide-react";
+import { ListFilter, CalendarIcon } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
 import {
     Pagination,
     PaginationContent,
@@ -86,6 +91,7 @@ import {
 } from "@/components/ui/select";
 import { IconSearch } from "@tabler/icons-react";
 import { GenericCombobox } from "@/components/generic-combobox";
+import { DatePicker } from "@/components/date-picker";
 
 type SettingsTab = "security" | "encoders" | "students" | "audit";
 
@@ -795,13 +801,15 @@ function AuditLogsTab() {
     const search = searchParams.get("search") || "";
     const filterAction = searchParams.get("action") || "";
     const filterEntity = searchParams.get("entity") || "";
+    const startDate = searchParams.get("startDate") || "";
+    const endDate = searchParams.get("endDate") || "";
 
     const [searchInput, setSearchInput] = useState(search);
     const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
 
-    const { data, isLoading } = useQuery({
-        queryKey: ["audit-logs", page, limit, search, filterAction, filterEntity],
-        queryFn: () => auditApi.getLogs(page, limit, search || undefined, filterAction || undefined, filterEntity || undefined),
+    const { data, isLoading, isFetching } = useQuery({
+        queryKey: ["audit-logs", page, limit, search, filterAction, filterEntity, startDate, endDate],
+        queryFn: () => auditApi.getLogs(page, limit, search || undefined, filterAction || undefined, filterEntity || undefined, undefined, startDate || undefined, endDate || undefined),
         enabled: user?.role === "admin",
         placeholderData: (previousData) => previousData,
     });
@@ -941,12 +949,36 @@ function AuditLogsTab() {
         router.push(`?${params.toString()}`);
     };
 
+    const handleStartDate = (val: string) => {
+        const params = new URLSearchParams(searchParams.toString());
+        if (val) {
+            params.set("startDate", val);
+        } else {
+            params.delete("startDate");
+        }
+        params.set("page", "1");
+        router.push(`?${params.toString()}`);
+    };
+
+    const handleEndDate = (val: string) => {
+        const params = new URLSearchParams(searchParams.toString());
+        if (val) {
+            params.set("endDate", val);
+        } else {
+            params.delete("endDate");
+        }
+        params.set("page", "1");
+        router.push(`?${params.toString()}`);
+    };
+
     const clearFilters = () => {
         setSearchInput("");
         const params = new URLSearchParams(searchParams.toString());
         params.delete("search");
         params.delete("action");
         params.delete("entity");
+        params.delete("startDate");
+        params.delete("endDate");
         params.set("page", "1");
         router.push(`?${params.toString()}`);
     };
@@ -1057,7 +1089,7 @@ function AuditLogsTab() {
 
                     {/* Filter Group */}
                     <div className="flex w-full lg:w-auto lg:flex-1 lg:justify-end gap-3 flex-wrap">
-                        {(search || filterAction || filterEntity) && (
+                        {(search || filterAction || filterEntity || startDate || endDate) && (
                             <Button
                                 variant="ghost"
                                 onClick={clearFilters}
@@ -1067,6 +1099,59 @@ function AuditLogsTab() {
                                 <span className="hidden sm:inline">Reset</span>
                             </Button>
                         )}
+
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    className={cn(
+                                        "justify-start text-left font-normal w-[240px] h-10",
+                                        !startDate && !endDate && "text-muted-foreground"
+                                    )}
+                                >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {startDate || endDate ? (
+                                        <span className="truncate">
+                                            {startDate ? new Date(startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Start"} - {endDate ? new Date(endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "End"}
+                                        </span>
+                                    ) : (
+                                        <span>Filter by Date</span>
+                                    )}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80 p-4" align="start">
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <h4 className="font-medium leading-none">Date Range</h4>
+                                        <p className="text-sm text-muted-foreground">
+                                            Filter audit logs by date range.
+                                        </p>
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="space-y-1">
+                                                <span className="text-xs font-medium">From</span>
+                                                <DatePicker
+                                                    placeholder="Start date"
+                                                    value={startDate}
+                                                    onChange={handleStartDate}
+                                                    className="w-full"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <span className="text-xs font-medium">To</span>
+                                                <DatePicker
+                                                    placeholder="End date"
+                                                    value={endDate}
+                                                    onChange={handleEndDate}
+                                                    className="w-full"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </PopoverContent>
+                        </Popover>
 
                         {/* Action Filter */}
                         <div className="w-full sm:w-[200px]">
@@ -1094,7 +1179,12 @@ function AuditLogsTab() {
                     </div>
                 </div>
 
-                <CardContent className="p-0">
+                <CardContent className="p-0 relative min-h-[300px]">
+                    {isFetching && !isLoading && (
+                        <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-10 flex items-center justify-center transition-all duration-200">
+                            <IconLoader2 className="size-8 animate-spin text-primary" />
+                        </div>
+                    )}
                     {isLoading ? (
                         <div className="p-12 text-center text-zinc-500 flex flex-col items-center justify-center gap-2">
                             <IconLoader2 className="size-8 animate-spin text-zinc-400" />

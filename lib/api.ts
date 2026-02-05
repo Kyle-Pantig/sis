@@ -202,12 +202,14 @@ export const usersApi = {
 };
 
 export const auditApi = {
-    getLogs: (page: number = 1, limit: number = 50, search?: string, action?: string, entity?: string, entityId?: string) => {
+    getLogs: (page: number = 1, limit: number = 50, search?: string, action?: string, entity?: string, entityId?: string, startDate?: string, endDate?: string) => {
         const params = new URLSearchParams({ page: String(page), limit: String(limit) });
         if (search) params.set("search", search);
         if (action) params.set("action", action);
         if (entity) params.set("entity", entity);
         if (entityId) params.set("entityId", entityId);
+        if (startDate) params.set("startDate", startDate);
+        if (endDate) params.set("endDate", endDate);
         return fetchApi(`/api/audit?${params.toString()}`);
     },
     getFilters: () => {

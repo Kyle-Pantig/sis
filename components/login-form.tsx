@@ -90,6 +90,7 @@ export function LoginForm({
                   id="password"
                   type="password"
                   autoComplete="off"
+                  placeholder="••••••••"
                   {...register("password")}
                   className={errors.password ? "border-red-500" : ""}
                 />

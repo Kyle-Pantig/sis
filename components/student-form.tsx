@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CourseCombobox } from "@/components/course-combobox";
+import { DatePicker } from "@/components/date-picker";
 import {
     Dialog,
     DialogContent,
@@ -62,7 +63,7 @@ export function StudentForm({
     });
 
     const selectedCourseId = watch("courseId");
-
+    const birthDate = watch("birthDate");
 
 
     useEffect(() => {
@@ -143,16 +144,14 @@ export function StudentForm({
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="birthDate">Birth Date *</Label>
-                                <Input
+                                <DatePicker
                                     id="birthDate"
-                                    type="date"
-                                    {...register("birthDate")}
-                                    className={errors.birthDate ? "border-red-500" : ""}
+                                    label="Birth Date *"
+                                    value={birthDate}
+                                    onChange={(value) => setValue("birthDate", value, { shouldValidate: true })}
+                                    error={errors.birthDate?.message}
+                                    className="gap-2"
                                 />
-                                {errors.birthDate && (
-                                    <p className="text-xs text-red-500">{errors.birthDate.message}</p>
-                                )}
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="email">Email Address</Label>

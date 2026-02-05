@@ -31,8 +31,8 @@ interface GenericComboboxProps {
 }
 
 export function GenericCombobox({
-    value,
-    onValueChange,
+    value: externalValue,
+    onValueChange: onExternalValueChange,
     items,
     placeholder = "Select...",
     className,
@@ -40,14 +40,25 @@ export function GenericCombobox({
     isLoading = false,
     leftIcon,
 }: GenericComboboxProps) {
+    // Internal state for optimistic updates
+    const [internalValue, setInternalValue] = React.useState(externalValue);
+
+    // Sync internal state with external value changes (e.g. navigation)
+    React.useEffect(() => {
+        setInternalValue(externalValue);
+    }, [externalValue]);
+
     const selectedOption = React.useMemo(() => {
-        return items.find((o) => o.value === value && !o.disabled) || null;
-    }, [items, value]);
+        return items.find((o) => o.value === internalValue && !o.disabled) || null;
+    }, [items, internalValue]);
 
     const handleValueChange = (newOption: ComboboxOption | null) => {
         // Don't allow selecting disabled items
         if (newOption?.disabled) return;
-        onValueChange(newOption?.value ?? "");
+
+        const newValue = newOption?.value ?? "";
+        setInternalValue(newValue); // Optimistic update
+        onExternalValueChange(newValue);
     };
 
     return (

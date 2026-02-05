@@ -126,9 +126,10 @@ export default function CoursesPage() {
     const { user } = useAuth();
 
     // Queries
-    const { data, isLoading: loading } = useQuery<PaginatedCourses>({
+    const { data, isLoading: loading, isFetching } = useQuery<PaginatedCourses>({
         queryKey: ["courses", page, limit, search],
         queryFn: () => coursesApi.getAll(page, limit, search || undefined),
+        placeholderData: (previousData) => previousData,
     });
 
     const courses = data?.courses || [];
@@ -604,7 +605,7 @@ export default function CoursesPage() {
                                         params.set("page", "1");
                                         router.push(`?${params.toString()}`);
                                     }}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                                    className="cursor-pointer absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
                                 >
                                     <X className="size-4" />
                                 </button>
@@ -618,20 +619,15 @@ export default function CoursesPage() {
                         >
                             <IconSearch className="size-4" />
                         </Button>
-                        {search && (
-                            <Button
-                                variant="ghost"
-                                onClick={clearFilters}
-                                className="text-zinc-500 hover:text-zinc-900 gap-2 px-3 h-10"
-                            >
-                                <IconX className="size-4" />
-                                <span className="hidden sm:inline">Reset</span>
-                            </Button>
-                        )}
                     </div>
                 </div>
 
-                <CardContent className="p-0">
+                <CardContent className="p-0 relative min-h-[300px]">
+                    {isFetching && !loading && (
+                        <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-10 flex items-center justify-center transition-all duration-200">
+                            <IconLoader2 className="size-8 animate-spin text-primary" />
+                        </div>
+                    )}
                     <div className="border-t">
                         <GenericDataTable
                             columns={columns}

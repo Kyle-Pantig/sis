@@ -14,7 +14,9 @@ export const auditRoutes = new Elysia({ prefix: "/audit" })
             search: t.Optional(t.String()),
             action: t.Optional(t.String()),
             entity: t.Optional(t.String()),
-            entityId: t.Optional(t.String())
+            entityId: t.Optional(t.String()),
+            startDate: t.Optional(t.String()),
+            endDate: t.Optional(t.String())
         }),
         requireRoles: ["admin"]
     })

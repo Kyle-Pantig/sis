@@ -18,7 +18,7 @@ export class AuditService {
         }
     }
 
-    static async getLogs(page = 1, limit = 50, search?: string, action?: string, entity?: string) {
+    static async getLogs(page = 1, limit = 50, search?: string, action?: string, entity?: string, startDate?: string, endDate?: string) {
         const skip = (page - 1) * limit;
 
         const where: any = {};
@@ -31,6 +31,18 @@ export class AuditService {
 
         if (entity) {
             andFilters.push({ entity: { equals: entity, mode: "insensitive" } });
+        }
+
+        if (startDate) {
+            const start = new Date(startDate);
+            start.setHours(0, 0, 0, 0);
+            andFilters.push({ createdAt: { gte: start } });
+        }
+
+        if (endDate) {
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            andFilters.push({ createdAt: { lte: end } });
         }
 
         if (search) {

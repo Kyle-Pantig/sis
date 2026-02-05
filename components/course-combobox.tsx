@@ -54,8 +54,8 @@ type CourseComboboxProps = (SingleSelectProps | MultiSelectProps) & {
 };
 
 export function CourseCombobox({
-    value,
-    onValueChange,
+    value: externalValue,
+    onValueChange: onExternalValueChange,
     placeholder = "Select course...",
     includeAll = false,
     className,
@@ -72,6 +72,14 @@ export function CourseCombobox({
 
     const courses = coursesData?.courses || [];
 
+    // Internal state for optimistic updates
+    const [internalValue, setInternalValue] = React.useState(externalValue);
+
+    // Sync internal state with external value changes
+    React.useEffect(() => {
+        setInternalValue(externalValue);
+    }, [externalValue]);
+
     const options: CourseOption[] = React.useMemo(() => {
         const items = courses.map((c) => ({
             value: c.id,
@@ -87,19 +95,22 @@ export function CourseCombobox({
 
     const selectedOption = React.useMemo(() => {
         if (multiple) {
-            const valArray = value as string[];
+            const valArray = internalValue as string[];
             return options.filter((o) => valArray.includes(o.value));
         }
-        return options.find((o) => o.value === value) || null;
-    }, [options, value, multiple]);
+        return options.find((o) => o.value === internalValue) || null;
+    }, [options, internalValue, multiple]);
 
     const handleValueChange = (newOption: CourseOption | CourseOption[] | null) => {
         if (multiple) {
             const newOptions = (newOption as CourseOption[]) || [];
-            (onValueChange as (val: string[]) => void)(newOptions.map((o) => o.value));
+            const newValues = newOptions.map((o) => o.value);
+            setInternalValue(newValues); // Optimistic update
+            (onExternalValueChange as (val: string[]) => void)(newValues);
         } else {
             const newValue = (newOption as CourseOption | null)?.value ?? (includeAll ? "all" : "");
-            (onValueChange as (val: string) => void)(newValue);
+            setInternalValue(newValue); // Optimistic update
+            (onExternalValueChange as (val: string) => void)(newValue);
         }
     };
 

@@ -659,9 +659,7 @@ export default function SubjectsPage() {
                 <CardContent className="p-0 relative">
                     {isFetching && !loading && (
                         <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-10 flex items-center justify-center">
-                            <div className="flex items-center justify-center">
-                                <IconLoader2 className="size-8 animate-spin text-emerald-600" />
-                            </div>
+                            <IconLoader2 className="size-8 animate-spin text-primary" />
                         </div>
                     )}
                     <div className="border-t">

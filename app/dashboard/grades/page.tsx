@@ -1003,7 +1003,7 @@ export default function GradesPage() {
                     {isFetching && !loading && (
                         <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-10 flex items-center justify-center">
                             <div className="flex items-center justify-center">
-                                <IconLoader2 className="size-8 animate-spin text-emerald-600" />
+                                <IconLoader2 className="size-8 animate-spin text-primary" />
                             </div>
                         </div>
                     )}
