@@ -1,13 +1,13 @@
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconKey, IconLock, IconLoader2 } from "@tabler/icons-react";
+import { IconKey, IconLock, IconLoader2, IconSettings } from "@tabler/icons-react";
 
 export function StudentsTab() {
     const { user } = useAuth();
 
     if (user?.role !== "admin") {
         return (
-            <Card className="border-none shadow-sm bg-white overflow-hidden py-0">
+            <Card className="overflow-hidden py-0">
                 <CardHeader className="border-b bg-zinc-50/50 pb-8 pt-8">
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-white rounded-xl shadow-sm border border-zinc-100">
@@ -37,7 +37,7 @@ export function StudentsTab() {
     }
 
     return (
-        <Card className="border-none shadow-sm bg-white overflow-hidden py-0">
+        <Card className="overflow-hidden py-0">
             <CardHeader className="border-b bg-zinc-50/50 pb-8 pt-8">
                 <div className="flex items-center gap-4">
                     <div className="p-3 bg-white rounded-xl shadow-sm border border-zinc-100">
@@ -51,8 +51,8 @@ export function StudentsTab() {
             </CardHeader>
             <CardContent className="p-12 text-center">
                 <div className="max-w-md mx-auto space-y-6 bg-zinc-50/50 p-8 rounded-2xl border border-zinc-100">
-                    <div className="size-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto border border-zinc-100">
-                        <IconLoader2 className="size-8 text-zinc-400" />
+                    <div className="size-16 bg-white rounded-full border-2 border-zinc-100 flex items-center justify-center mx-auto">
+                        <IconSettings className="size-8 text-zinc-400" />
                     </div>
                     <div className="space-y-2">
                         <h3 className="text-lg font-bold text-zinc-900">Feature Coming Soon</h3>

@@ -51,7 +51,7 @@ export function SecurityTab() {
     };
 
     return (
-        <Card className="border-none shadow-sm overflow-hidden py-0">
+        <Card className="overflow-hidden py-0">
             <CardHeader className="border-b bg-zinc-50/50 pb-8 pt-8">
                 <div className="flex items-center gap-4">
                     <div className="p-3 bg-white rounded-xl shadow-sm border border-zinc-100">

@@ -274,7 +274,7 @@ export function AuditLogsTab() {
 
     return (
         <div className="space-y-6 pb-20">
-            <Card className="border-none shadow-sm bg-white overflow-hidden py-0">
+            <Card className="overflow-hidden py-0 gap-2">
                 <CardHeader className="border-b bg-zinc-50/50 pb-8 pt-8">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
@@ -307,7 +307,7 @@ export function AuditLogsTab() {
                 </CardHeader>
 
                 {/* Search and Filters - MATCH STUDENT PAGE UI */}
-                <div className="px-6 py-6 flex flex-col lg:flex-row gap-4 items-start lg:items-center border-b bg-zinc-50/30">
+                <div className="px-6 py-6 flex flex-col lg:flex-row gap-2 sm:gap-4 items-start lg:items-center border-b bg-zinc-50/30">
                     {/* Search Group */}
                     <div className="flex w-full lg:max-w-md">
                         <div className="relative flex flex-1">
@@ -353,90 +353,86 @@ export function AuditLogsTab() {
                     </div>
 
                     {/* Filter Group */}
-                    <div className="flex w-full lg:w-auto lg:flex-1 lg:justify-end gap-3 flex-wrap">
+                    {/* Filter Group */}
+                    <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto lg:flex-1 lg:justify-end items-start sm:items-center">
                         {(search || filterAction || filterEntity || startDate || endDate) && (
                             <Button
                                 variant="ghost"
                                 onClick={clearFilters}
-                                className="text-zinc-500 hover:text-zinc-900 gap-2 px-3 h-10"
+                                className="text-zinc-500 hover:text-zinc-900 gap-2 px-3 h-10 w-full sm:w-auto order-last sm:order-first"
                             >
                                 <IconX className="size-4" />
-                                <span className="hidden sm:inline">Reset</span>
+                                <span className="inline">Reset</span>
                             </Button>
                         )}
 
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    className={cn(
-                                        "justify-start text-left font-normal w-[240px] h-10",
-                                        !startDate && !endDate && "text-muted-foreground"
-                                    )}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {startDate || endDate ? (
-                                        <span className="truncate">
-                                            {startDate ? new Date(startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Start"} - {endDate ? new Date(endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "End"}
-                                        </span>
-                                    ) : (
-                                        <span>Filter by Date</span>
-                                    )}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80 p-4" align="start">
-                                <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <h4 className="font-medium leading-none">Date Range</h4>
-                                        <p className="text-sm text-muted-foreground">
-                                            Filter audit logs by date range.
-                                        </p>
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <div className="space-y-1">
-                                                <span className="text-xs font-medium">From</span>
-                                                <DatePicker
-                                                    placeholder="Start date"
-                                                    value={startDate}
-                                                    onChange={handleStartDate}
-                                                    className="w-full"
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <span className="text-xs font-medium">To</span>
-                                                <DatePicker
-                                                    placeholder="End date"
-                                                    value={endDate}
-                                                    onChange={handleEndDate}
-                                                    className="w-full"
-                                                />
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full sm:w-auto">
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        className={cn(
+                                            "font-normal h-10 w-full justify-start text-left px-3",
+                                            !startDate && !endDate && "text-muted-foreground"
+                                        )}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                                        {startDate || endDate ? (
+                                            <span className="truncate">
+                                                {startDate ? new Date(startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Start"} - {endDate ? new Date(endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "End"}
+                                            </span>
+                                        ) : (
+                                            <span className="truncate">Date</span>
+                                        )}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-80 p-4" align="end">
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <h4 className="font-medium leading-none">Date Range</h4>
+                                            <p className="text-sm text-muted-foreground">
+                                                Filter audit logs by date range.
+                                            </p>
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div className="space-y-1">
+                                                    <span className="text-xs font-medium">From</span>
+                                                    <DatePicker
+                                                        placeholder="Start date"
+                                                        value={startDate}
+                                                        onChange={handleStartDate}
+                                                        className="w-full"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <span className="text-xs font-medium">To</span>
+                                                    <DatePicker
+                                                        placeholder="End date"
+                                                        value={endDate}
+                                                        onChange={handleEndDate}
+                                                        className="w-full"
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            </PopoverContent>
-                        </Popover>
+                                </PopoverContent>
+                            </Popover>
 
-                        {/* Action Filter */}
-                        <div className="w-full sm:w-[200px]">
                             <GenericCombobox
                                 value={filterAction}
                                 onValueChange={handleFilterAction}
                                 items={fullActionOptions}
-                                placeholder="All Actions"
+                                placeholder="Action"
                                 className="w-full h-10 bg-white"
                                 leftIcon={<ListFilter className="size-4 text-zinc-400" />}
                             />
-                        </div>
-
-                        {/* Entity Filter */}
-                        <div className="w-full sm:w-[200px]">
                             <GenericCombobox
                                 value={filterEntity}
                                 onValueChange={handleFilterEntity}
                                 items={fullEntityOptions}
-                                placeholder="All Entities"
+                                placeholder="Entity"
                                 className="w-full h-10 bg-white"
                                 leftIcon={<ListFilter className="size-4 text-zinc-400" />}
                             />

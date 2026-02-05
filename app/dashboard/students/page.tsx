@@ -513,7 +513,7 @@ export default function StudentsPage() {
 
     return (
         <div className="space-y-6">
-            <Card className="border-none shadow-sm">
+            <Card className="gap-2">
                 <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <CardTitle className="text-xl">Student Masterlist</CardTitle>
@@ -575,7 +575,7 @@ export default function StudentsPage() {
                 </CardHeader>
 
                 {/* Search and Filters */}
-                <div className="px-6 pb-6 flex flex-col lg:flex-row gap-4 items-start lg:items-center">
+                <div className="px-6 pb-4 flex flex-col lg:flex-row gap-2 sm:gap-4 items-start lg:items-center">
                     {/* Search Group */}
                     <div className="flex w-full lg:max-w-md">
                         <div className="relative flex flex-1">

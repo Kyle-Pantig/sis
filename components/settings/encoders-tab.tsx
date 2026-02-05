@@ -213,7 +213,7 @@ export function EncodersTab() {
                 </TabsList>
 
                 <TabsContent value="active" className="mt-4">
-                    <Card className="border-none shadow-sm bg-white overflow-hidden">
+                    <Card className="overflow-hidden">
                         <CardContent className="p-0">
                             {isLoading ? (
                                 <div className="p-12 text-center text-zinc-500 flex flex-col items-center justify-center gap-2">
@@ -315,7 +315,7 @@ export function EncodersTab() {
                 </TabsContent>
 
                 <TabsContent value="pending" className="mt-4">
-                    <Card className="border-none shadow-sm bg-white overflow-hidden">
+                    <Card className="overflow-hidden">
                         <CardContent className="p-0">
                             {isInvitationsLoading ? (
                                 <div className="text-center text-zinc-500 py-12">Loading invitations...</div>

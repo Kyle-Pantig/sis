@@ -59,6 +59,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import { StudentProfile } from "@/types";
 
+// Helper to safely format grade values (handles strings from API)
+function formatGrade(grade: number | string | null | undefined): string {
+    if (grade === null || grade === undefined) return "—";
+    const numGrade = typeof grade === 'string' ? parseFloat(grade) : grade;
+    if (isNaN(numGrade)) return "—";
+    return numGrade.toFixed(2);
+}
+
+function getNumericGrade(grade: number | string | null | undefined): number | null {
+    if (grade === null || grade === undefined) return null;
+    const numGrade = typeof grade === 'string' ? parseFloat(grade) : grade;
+    if (isNaN(numGrade)) return null;
+    return numGrade;
+}
+
 export default function StudentProfilePage() {
     const { setTitle } = usePageTitle();
     const params = useParams();
@@ -377,7 +392,7 @@ export default function StudentProfilePage() {
                 <div className="space-y-6 xl:col-span-1">
 
                     {/* Student ID Card */}
-                    <Card className="border border-zinc-200 shadow-sm overflow-hidden py-0">
+                    <Card className="overflow-hidden py-0">
                         <div className="h-24 bg-gradient-to-br from-blue-600 to-indigo-700 relative">
                             <div className="absolute -bottom-10 left-6 p-1 bg-white rounded-full">
                                 <div className="size-20 rounded-full bg-zinc-100 flex items-center justify-center border border-zinc-200 shadow-inner">
@@ -463,7 +478,7 @@ export default function StudentProfilePage() {
                     </Card>
 
                     {/* Academic Performance Summary */}
-                    <Card className="border border-zinc-200 shadow-sm overflow-hidden">
+                    <Card className="overflow-hidden">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-base font-medium flex items-center gap-2 text-zinc-900">
                                 <IconChartBar className="size-4 text-zinc-500" />
@@ -512,7 +527,7 @@ export default function StudentProfilePage() {
 
                 {/* Right Column: Grades Table */}
                 <div className="xl:col-span-2 space-y-6">
-                    <Card className="border border-zinc-200 shadow-sm h-full flex flex-col py-0">
+                    <Card className="h-full flex flex-col py-0">
                         <CardHeader className="border-b border-zinc-100 bg-zinc-50/30 py-4">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div className="space-y-1">
@@ -582,25 +597,25 @@ export default function StudentProfilePage() {
 
                                                 {/* Grade Columns */}
                                                 <TableCell className="text-center py-4 text-sm font-medium text-zinc-600 align-middle">
-                                                    {grade?.prelim !== null && grade?.prelim !== undefined ? grade.prelim.toFixed(2) : <span className="text-zinc-300">—</span>}
+                                                    {grade?.prelim !== null && grade?.prelim !== undefined ? formatGrade(grade.prelim) : <span className="text-zinc-300">—</span>}
                                                 </TableCell>
                                                 <TableCell className="text-center py-4 text-sm font-medium text-zinc-600 align-middle">
-                                                    {grade?.midterm !== null && grade?.midterm !== undefined ? grade.midterm.toFixed(2) : <span className="text-zinc-300">—</span>}
+                                                    {grade?.midterm !== null && grade?.midterm !== undefined ? formatGrade(grade.midterm) : <span className="text-zinc-300">—</span>}
                                                 </TableCell>
                                                 <TableCell className="text-center py-4 text-sm font-medium text-zinc-600 align-middle">
-                                                    {grade?.finals !== null && grade?.finals !== undefined ? grade.finals.toFixed(2) : <span className="text-zinc-300">—</span>}
+                                                    {grade?.finals !== null && grade?.finals !== undefined ? formatGrade(grade.finals) : <span className="text-zinc-300">—</span>}
                                                 </TableCell>
 
                                                 {/* Final Grade Highlight */}
                                                 <TableCell className={cn(
                                                     "text-center py-4 text-sm align-middle transition-colors font-bold",
-                                                    grade?.finalGrade !== null && grade?.finalGrade !== undefined ? (
-                                                        grade.finalGrade <= 3.0
+                                                    getNumericGrade(grade?.finalGrade) !== null ? (
+                                                        getNumericGrade(grade?.finalGrade)! <= 3.0
                                                             ? "bg-emerald-50 text-emerald-700"
                                                             : "bg-red-50 text-red-700"
                                                     ) : "text-zinc-400 bg-zinc-50/30 font-medium"
                                                 )}>
-                                                    {grade?.finalGrade !== null && grade?.finalGrade !== undefined ? grade.finalGrade.toFixed(2) : "—"}
+                                                    {formatGrade(grade?.finalGrade)}
                                                 </TableCell>
 
                                                 {/* Remarks Badge */}
