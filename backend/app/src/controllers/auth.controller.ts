@@ -28,8 +28,8 @@ export class AuthController {
                 httpOnly: true,
                 maxAge: 7 * 86400, // 7 days
                 path: "/",
-                sameSite: "lax",
-                secure: false, // Set to true if using HTTPS
+                sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+                secure: process.env.NODE_ENV === "production",
             });
 
             return {
