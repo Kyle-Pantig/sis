@@ -16,6 +16,10 @@ export const userRoutes = new Elysia({ prefix: "/users" })
     .delete("/invitations/:id", (context: any) => UserController.deleteInvitation(context), {
         requireRoles: ["admin"]
     })
+    // Resend invitation
+    .post("/invitations/:id/resend", (context: any) => UserController.resendInvitation(context), {
+        requireRoles: ["admin"]
+    })
     // Invite new encoder
     .post("/encoders", (context: any) => UserController.inviteEncoder(context), {
         body: t.Object({

@@ -26,4 +26,8 @@ export class EmailService {
             throw new Error("Failed to send invitation email");
         }
     }
+
+    static async resendInvitation(email: string, token: string) {
+        return this.sendInvitation(email, token);
+    }
 }

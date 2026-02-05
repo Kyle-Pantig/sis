@@ -44,7 +44,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { IconDotsVertical, IconTrash, IconBan, IconCircleCheck, IconPlus, IconX, IconInfoCircle } from "@tabler/icons-react";
+import { IconDotsVertical, IconTrash, IconBan, IconCircleCheck, IconPlus, IconX, IconInfoCircle, IconRefresh } from "@tabler/icons-react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
     Dialog,
     DialogContent,
@@ -381,6 +382,19 @@ function EncodersTab() {
         enabled: user?.role === "admin",
     });
 
+    const resendMutation = useMutation({
+        mutationFn: usersApi.resendInvitation,
+        onSuccess: (data) => {
+            if (data.error) {
+                toast.error(data.error);
+            } else {
+                toast.success("Invitation resent");
+                queryClient.invalidateQueries({ queryKey: ["invitations"] });
+            }
+        },
+        onError: () => toast.error("Failed to resend invitation"),
+    });
+
     const revokeMutation = useMutation({
         mutationFn: usersApi.deleteInvitation,
         onSuccess: (data) => {
@@ -602,8 +616,13 @@ function EncodersTab() {
                                                                     )}
                                                                 </DropdownMenuItem>
                                                                 <DropdownMenuSeparator />
-                                                                <AlertDialog>
-                                                                    <AlertDialogTrigger asChild>
+                                                                <ConfirmDialog
+                                                                    title="Delete Account"
+                                                                    description="This action cannot be undone. This will permanently delete the encoder account."
+                                                                    onConfirm={() => deleteMutation.mutate(encoder.id)}
+                                                                    isLoading={deleteMutation.isPending}
+                                                                    variant="destructive"
+                                                                    trigger={
                                                                         <DropdownMenuItem
                                                                             onSelect={(e) => e.preventDefault()}
                                                                             className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
@@ -611,25 +630,8 @@ function EncodersTab() {
                                                                             <IconTrash className="size-4 mr-2" />
                                                                             Delete Account
                                                                         </DropdownMenuItem>
-                                                                    </AlertDialogTrigger>
-                                                                    <AlertDialogContent>
-                                                                        <AlertDialogHeader>
-                                                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                                            <AlertDialogDescription>
-                                                                                This action cannot be undone. This will permanently delete the encoder account.
-                                                                            </AlertDialogDescription>
-                                                                        </AlertDialogHeader>
-                                                                        <AlertDialogFooter>
-                                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                            <AlertDialogAction
-                                                                                onClick={() => deleteMutation.mutate(encoder.id)}
-                                                                                className="bg-red-600 hover:bg-red-700"
-                                                                            >
-                                                                                Delete
-                                                                            </AlertDialogAction>
-                                                                        </AlertDialogFooter>
-                                                                    </AlertDialogContent>
-                                                                </AlertDialog>
+                                                                    }
+                                                                />
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
                                                     </TableCell>
@@ -691,20 +693,38 @@ function EncodersTab() {
                                                             </Badge>
                                                         </TableCell>
                                                         <TableCell className="text-right pr-6">
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="size-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                                                disabled={revokeMutation.isPending}
-                                                                onClick={() => revokeMutation.mutate(invite.id)}
-                                                                title="Revoke Invitation"
-                                                            >
-                                                                {revokeMutation.isPending ? (
-                                                                    <IconLoader2 className="size-4 animate-spin" />
-                                                                ) : (
-                                                                    <IconTrash className="size-4" />
+                                                            <div className="flex items-center justify-end gap-1">
+                                                                {isExpired && (
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="size-8 text-primary hover:text-primary hover:bg-primary/10"
+                                                                        disabled={resendMutation.isPending}
+                                                                        onClick={() => resendMutation.mutate(invite.id)}
+                                                                        title="Resend Invitation"
+                                                                    >
+                                                                        {resendMutation.isPending ? (
+                                                                            <IconLoader2 className="size-4 animate-spin" />
+                                                                        ) : (
+                                                                            <IconRefresh className="size-4" />
+                                                                        )}
+                                                                    </Button>
                                                                 )}
-                                                            </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="size-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                                    disabled={revokeMutation.isPending}
+                                                                    onClick={() => revokeMutation.mutate(invite.id)}
+                                                                    title="Revoke Invitation"
+                                                                >
+                                                                    {revokeMutation.isPending ? (
+                                                                        <IconLoader2 className="size-4 animate-spin" />
+                                                                    ) : (
+                                                                        <IconTrash className="size-4" />
+                                                                    )}
+                                                                </Button>
+                                                            </div>
                                                         </TableCell>
                                                     </TableRow>
                                                 );
@@ -1005,31 +1025,19 @@ function AuditLogsTab() {
                             </div>
                         </div>
                         {selectedIds.length > 0 && (
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
+                            <ConfirmDialog
+                                title="Delete Audit Logs"
+                                description={`This will permanently delete ${selectedIds.length} selected audit log entries. This action cannot be undone.`}
+                                onConfirm={() => bulkDeleteMutation.mutate(selectedIds)}
+                                isLoading={bulkDeleteMutation.isPending}
+                                variant="destructive"
+                                trigger={
                                     <Button variant="destructive" size="sm" className="gap-2 h-9">
                                         <IconTrash className="size-4" />
                                         Delete ({selectedIds.length})
                                     </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            This will permanently delete {selectedIds.length} selected audit log entries. This action cannot be undone.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction
-                                            className="bg-red-600 hover:bg-red-700"
-                                            onClick={() => bulkDeleteMutation.mutate(selectedIds)}
-                                        >
-                                            Delete Forever
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
+                                }
+                            />
                         )}
                     </div>
                 </CardHeader>

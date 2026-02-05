@@ -71,6 +71,50 @@ export const UserController = {
         }
     },
 
+    // Resend invitation
+    resendInvitation: async (ctx: any) => {
+        const { params: { id }, jwt, cookie: { session } } = ctx;
+        let currentUser = ctx.user;
+        if (!currentUser && session?.value) {
+            try { currentUser = await jwt.verify(session.value); } catch (e) { }
+        }
+
+        try {
+            const existingInvitation = await prisma.invitation.findUnique({
+                where: { id },
+            });
+
+            if (!existingInvitation) {
+                return { error: "Invitation not found" };
+            }
+
+            const token = crypto.randomUUID();
+            const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+            const updatedInvitation = await prisma.invitation.update({
+                where: { id },
+                data: {
+                    token,
+                    expiresAt,
+                    createdAt: new Date(), // Refresh the creation date too
+                },
+            });
+
+            await EmailService.resendInvitation(updatedInvitation.email, token);
+
+            if (currentUser?.id) {
+                await AuditService.log(currentUser.id, "RESEND_INVITATION", "Invitation", id, {
+                    email: updatedInvitation.email
+                });
+            }
+
+            return { message: "Invitation resent successfully" };
+        } catch (error) {
+            console.error("Error resending invitation:", error);
+            return { error: "Failed to resend invitation" };
+        }
+    },
+
     // Invite a new encoder
     inviteEncoder: async (ctx: any) => {
         const { body: { email }, jwt, cookie: { session } } = ctx;

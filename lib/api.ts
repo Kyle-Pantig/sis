@@ -188,6 +188,9 @@ export const usersApi = {
     deleteInvitation: (id: string) => fetchApi(`/api/users/invitations/${id}`, {
         method: "DELETE",
     }),
+    resendInvitation: (id: string) => fetchApi(`/api/users/invitations/${id}/resend`, {
+        method: "POST",
+    }),
     createEncoder: (data: any) => fetchApi("/api/users/encoders", {
         method: "POST",
         body: JSON.stringify(data),
