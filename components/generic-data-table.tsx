@@ -110,7 +110,13 @@ export function GenericDataTable<TData, TValue>({
                                 onClick={() => onRowClick?.(row.original)}
                             >
                                 {row.getVisibleCells().map((cell) => (
-                                    <TableCell key={cell.id} className="px-4 py-3">
+                                    <TableCell
+                                        key={cell.id}
+                                        className={cn(
+                                            "px-4 py-3",
+                                            (cell.column.columnDef.meta as any)?.cellClassName
+                                        )}
+                                    >
                                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                     </TableCell>
                                 ))}

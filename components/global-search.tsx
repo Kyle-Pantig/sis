@@ -145,14 +145,14 @@ export function GlobalSearch() {
 
                     {/* Results List */}
                     <CommandPrimitive.List className="max-h-[400px] overflow-y-auto overflow-x-hidden p-2">
-                        <CommandPrimitive.Empty className="py-8 text-center text-sm text-zinc-500">
+                        <CommandPrimitive.Empty className="py-12 text-center text-sm text-zinc-500">
                             {isLoading ? (
-                                <div className="flex items-center justify-center gap-2">
-                                    <IconLoader2 className="size-4 animate-spin" />
-                                    <span>Searching...</span>
-                                </div>
+                                <span className="animate-pulse">Searching the system...</span>
                             ) : query ? (
-                                "No results found."
+                                <div className="flex flex-col items-center gap-2">
+                                    <p>No results found for &quot;<span className="font-bold text-zinc-900">{query}</span>&quot;</p>
+                                    <p className="text-xs text-zinc-400">Try searching for a student name, course code, or a setting page.</p>
+                                </div>
                             ) : (
                                 "Type to search students, courses or select a page below."
                             )}
@@ -217,102 +217,68 @@ export function GlobalSearch() {
                         )}
 
                         {/* Pages Group */}
-                        <CommandPrimitive.Group className="px-1 py-2">
-                            <p className="px-2 pb-2 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                                Pages
-                            </p>
-                            <CommandPrimitive.Item
-                                value="dashboard"
-                                onSelect={() => runCommand(() => router.push("/dashboard"))}
-                                className="relative flex cursor-pointer select-none items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors data-[selected=true]:bg-zinc-100 hover:bg-zinc-50"
-                            >
-                                <IconLayoutDashboard className="size-4 text-zinc-500" />
-                                <span>Dashboard</span>
-                            </CommandPrimitive.Item>
-                            <CommandPrimitive.Item
-                                value="students"
-                                onSelect={() => runCommand(() => router.push("/dashboard/students"))}
-                                className="relative flex cursor-pointer select-none items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors data-[selected=true]:bg-zinc-100 hover:bg-zinc-50"
-                            >
-                                <IconUsers className="size-4 text-zinc-500" />
-                                <span>Students List</span>
-                            </CommandPrimitive.Item>
-                            <CommandPrimitive.Item
-                                value="courses"
-                                onSelect={() => runCommand(() => router.push("/dashboard/courses"))}
-                                className="relative flex cursor-pointer select-none items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors data-[selected=true]:bg-zinc-100 hover:bg-zinc-50"
-                            >
-                                <IconFolder className="size-4 text-zinc-500" />
-                                <span>Courses Catalog</span>
-                            </CommandPrimitive.Item>
-                            <CommandPrimitive.Item
-                                value="subjects"
-                                onSelect={() => runCommand(() => router.push("/dashboard/subjects"))}
-                                className="relative flex cursor-pointer select-none items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors data-[selected=true]:bg-zinc-100 hover:bg-zinc-50"
-                            >
-                                <IconListDetails className="size-4 text-zinc-500" />
-                                <span>Subjects Inventory</span>
-                            </CommandPrimitive.Item>
-                            <CommandPrimitive.Item
-                                value="grades"
-                                onSelect={() => runCommand(() => router.push("/dashboard/grades"))}
-                                className="relative flex cursor-pointer select-none items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors data-[selected=true]:bg-zinc-100 hover:bg-zinc-50"
-                            >
-                                <IconChartBar className="size-4 text-zinc-500" />
-                                <span>Grading System</span>
-                            </CommandPrimitive.Item>
-                        </CommandPrimitive.Group>
+                        {(() => {
+                            const staticPages = [
+                                { title: "Dashboard", value: "dashboard", icon: IconLayoutDashboard, href: "/dashboard" },
+                                { title: "Students List", value: "students", icon: IconUsers, href: "/dashboard/students" },
+                                { title: "Courses Catalog", value: "courses", icon: IconFolder, href: "/dashboard/courses" },
+                                { title: "Subjects Inventory", value: "subjects", icon: IconListDetails, href: "/dashboard/subjects" },
+                                { title: "Grading System", value: "grades", icon: IconChartBar, href: "/dashboard/grades" },
+                            ].filter(p => !query || p.title.toLowerCase().includes(query.toLowerCase()));
+
+                            if (staticPages.length === 0) return null;
+
+                            return (
+                                <CommandPrimitive.Group className="px-1 py-2">
+                                    <p className="px-2 pb-2 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                                        Pages
+                                    </p>
+                                    {staticPages.map(page => (
+                                        <CommandPrimitive.Item
+                                            key={page.value}
+                                            value={page.value}
+                                            onSelect={() => runCommand(() => router.push(page.href))}
+                                            className="relative flex cursor-pointer select-none items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors data-[selected=true]:bg-zinc-100 hover:bg-zinc-50"
+                                        >
+                                            <page.icon className="size-4 text-zinc-500" />
+                                            <span>{page.title}</span>
+                                        </CommandPrimitive.Item>
+                                    ))}
+                                </CommandPrimitive.Group>
+                            );
+                        })()}
 
                         {/* System Group */}
-                        <CommandPrimitive.Group className="px-1 py-2 border-t border-zinc-100">
-                            <p className="px-2 pb-2 pt-1 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                                System
-                            </p>
-                            <CommandPrimitive.Item
-                                value="settings"
-                                onSelect={() => runCommand(() => router.push("/dashboard/settings"))}
-                                className="relative flex cursor-pointer select-none items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors data-[selected=true]:bg-zinc-100 hover:bg-zinc-50"
-                            >
-                                <IconSettings className="size-4 text-zinc-500" />
-                                <span>Application Settings</span>
-                            </CommandPrimitive.Item>
-                            <CommandPrimitive.Item
-                                value="password"
-                                onSelect={() => runCommand(() => router.push("/dashboard/settings?tab=security"))}
-                                className="relative flex cursor-pointer select-none items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors data-[selected=true]:bg-zinc-100 hover:bg-zinc-50"
-                            >
-                                <IconLock className="size-4 text-zinc-500" />
-                                <span>Change Password</span>
-                            </CommandPrimitive.Item>
-                            {user?.role === "admin" && (
-                                <>
-                                    <CommandPrimitive.Item
-                                        value="encoders"
-                                        onSelect={() => runCommand(() => router.push("/dashboard/settings?tab=encoders"))}
-                                        className="relative flex cursor-pointer select-none items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors data-[selected=true]:bg-zinc-100 hover:bg-zinc-50"
-                                    >
-                                        <IconUsers className="size-4 text-zinc-500" />
-                                        <span>Encoder Management</span>
-                                    </CommandPrimitive.Item>
-                                    <CommandPrimitive.Item
-                                        value="credentials"
-                                        onSelect={() => runCommand(() => router.push("/dashboard/settings?tab=students"))}
-                                        className="relative flex cursor-pointer select-none items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors data-[selected=true]:bg-zinc-100 hover:bg-zinc-50"
-                                    >
-                                        <IconKey className="size-4 text-zinc-500" />
-                                        <span>Student Credentials</span>
-                                    </CommandPrimitive.Item>
-                                    <CommandPrimitive.Item
-                                        value="audit"
-                                        onSelect={() => runCommand(() => router.push("/dashboard/settings?tab=audit"))}
-                                        className="relative flex cursor-pointer select-none items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors data-[selected=true]:bg-zinc-100 hover:bg-zinc-50"
-                                    >
-                                        <IconDatabase className="size-4 text-zinc-500" />
-                                        <span>System Audit Logs</span>
-                                    </CommandPrimitive.Item>
-                                </>
-                            )}
-                        </CommandPrimitive.Group>
+                        {(() => {
+                            const systemPages = [
+                                { title: "Application Settings", value: "settings", icon: IconSettings, href: "/dashboard/settings", visible: true },
+                                { title: "Change Password", value: "password", icon: IconLock, href: "/dashboard/settings?tab=security", visible: true },
+                                { title: "Encoder Management", value: "encoders", icon: IconUsers, href: "/dashboard/settings?tab=encoders", visible: user?.role === "admin" },
+                                { title: "Student Credentials", value: "credentials", icon: IconKey, href: "/dashboard/settings?tab=students", visible: user?.role === "admin" },
+                                { title: "System Audit Logs", value: "audit", icon: IconDatabase, href: "/dashboard/settings?tab=audit", visible: user?.role === "admin" },
+                            ].filter(p => p.visible && (!query || p.title.toLowerCase().includes(query.toLowerCase())));
+
+                            if (systemPages.length === 0) return null;
+
+                            return (
+                                <CommandPrimitive.Group className="px-1 py-2 border-t border-zinc-100">
+                                    <p className="px-2 pb-2 pt-1 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                                        System
+                                    </p>
+                                    {systemPages.map(page => (
+                                        <CommandPrimitive.Item
+                                            key={page.value}
+                                            value={page.value}
+                                            onSelect={() => runCommand(() => router.push(page.href))}
+                                            className="relative flex cursor-pointer select-none items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors data-[selected=true]:bg-zinc-100 hover:bg-zinc-50"
+                                        >
+                                            <page.icon className="size-4 text-zinc-500" />
+                                            <span>{page.title}</span>
+                                        </CommandPrimitive.Item>
+                                    ))}
+                                </CommandPrimitive.Group>
+                            );
+                        })()}
                     </CommandPrimitive.List>
                 </CommandPrimitive>
             </DialogContent>

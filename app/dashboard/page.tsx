@@ -29,6 +29,7 @@ import { useEffect, ReactNode, useState } from "react";
 import { usePageTitle } from "./layout";
 import { Bar, BarChart, CartesianGrid, LabelList, XAxis } from "recharts"
 import { TrendingUp } from "lucide-react"
+import { useAuth } from "@/context/auth-context";
 import {
   ChartContainer,
   ChartTooltip,
@@ -111,11 +112,25 @@ function QuickAction({
 
 // Recent Activity (Audit logs)
 function RecentActivityList() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+
   const { data: logs, isLoading } = useQuery({
     queryKey: ["recent-audit-logs"],
     queryFn: () => auditApi.getLogs(5),
-    refetchInterval: 30000, // Refresh every 30s
+    enabled: isAdmin,
+    refetchInterval: isAdmin ? 30000 : false,
   });
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-center bg-zinc-50/50 rounded-xl border border-dashed border-zinc-200 group-hover/bento:bg-white/5 transition-colors">
+        <IconShieldCheck className="size-8 text-zinc-300 mb-2 group-hover/bento:text-zinc-500" />
+        <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold group-hover/bento:text-zinc-400">Access Restricted</p>
+        <p className="text-[9px] text-zinc-400 mt-1 max-w-[120px] group-hover/bento:text-zinc-500">You don't have permission to view system activity logs.</p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

@@ -393,7 +393,10 @@ export default function SubjectsPage() {
                 {
                     accessorKey: "units",
                     header: "Units",
-                    meta: { headerClassName: "justify-center" },
+                    meta: {
+                        headerClassName: "justify-center",
+                        cellClassName: "text-center"
+                    },
                     cell: ({ row }) => <span className="font-bold">{row.original.units}</span>,
                 },
                 {
