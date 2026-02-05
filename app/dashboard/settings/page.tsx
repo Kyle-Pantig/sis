@@ -408,8 +408,6 @@ function EncodersTab() {
         onError: () => toast.error("Failed to revoke invitation"),
     });
 
-    // ... (toggleStatusMutation and deleteMutation remain same) ...
-
     const toggleStatusMutation = useMutation({
         mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
             usersApi.toggleStatus(id, isActive),
