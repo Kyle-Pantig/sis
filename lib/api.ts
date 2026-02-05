@@ -141,11 +141,12 @@ export const subjectsApi = {
 };
 
 export const gradesApi = {
-    getAll: (page: number = 1, limit: number = 10, courseId?: string, subjectId?: string, search?: string) => {
+    getAll: (page: number = 1, limit: number = 10, courseId?: string, subjectId?: string, search?: string, remarks?: string) => {
         const params = new URLSearchParams({ page: String(page), limit: String(limit) });
         if (courseId) params.set("courseId", courseId);
         if (subjectId) params.set("subjectId", subjectId);
         if (search) params.set("search", search);
+        if (remarks) params.set("remarks", remarks);
         return fetchApi(`/api/grades?${params.toString()}`);
     },
     getByStudent: (studentId: string) => fetchApi(`/api/grades/student/${studentId}`),

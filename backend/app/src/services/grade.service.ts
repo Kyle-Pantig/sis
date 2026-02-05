@@ -29,7 +29,7 @@ function calculateFinalGrade(prelim?: number | null, midterm?: number | null, fi
 }
 
 export class GradeService {
-    static async getAllGrades(page: number = 1, limit: number = 10, courseId?: string, subjectId?: string, search?: string) {
+    static async getAllGrades(page: number = 1, limit: number = 10, courseId?: string, subjectId?: string, search?: string, remarks?: string) {
         const skip = (page - 1) * limit;
 
         const where: any = {};
@@ -44,6 +44,17 @@ export class GradeService {
 
         if (subjectId) {
             where.subjectId = subjectId;
+        }
+
+        if (remarks) {
+            if (remarks === "Pending") {
+                where.OR = [
+                    { remarks: null },
+                    { remarks: "Pending" }
+                ];
+            } else {
+                where.remarks = remarks;
+            }
         }
 
         if (search) {

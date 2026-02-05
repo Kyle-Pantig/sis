@@ -140,6 +140,7 @@ export default function GradesPage() {
     const limit = parseInt(searchParams.get("limit") || "10");
     const filterCourse = searchParams.get("courseId") || "";
     const filterSubject = searchParams.get("subjectId") || "";
+    const filterRemarks = searchParams.get("remarks") || "";
     const search = searchParams.get("search") || "";
 
     const [searchInput, setSearchInput] = useState(search);
@@ -180,8 +181,8 @@ export default function GradesPage() {
 
     // Queries
     const { data, isLoading: loading, isFetching } = useQuery<PaginatedGrades>({
-        queryKey: ["grades", page, limit, filterCourse, filterSubject, search],
-        queryFn: () => gradesApi.getAll(page, limit, filterCourse || undefined, filterSubject || undefined, search || undefined),
+        queryKey: ["grades", page, limit, filterCourse, filterSubject, search, filterRemarks],
+        queryFn: () => gradesApi.getAll(page, limit, filterCourse || undefined, filterSubject || undefined, search || undefined, filterRemarks || undefined),
         placeholderData: (previousData) => previousData,
     });
 
@@ -550,6 +551,17 @@ export default function GradesPage() {
             params.set("subjectId", subjectId);
         } else {
             params.delete("subjectId");
+        }
+        params.set("page", "1");
+        router.push(`?${params.toString()}`);
+    }
+
+    function handleFilterRemarks(remarks: string) {
+        const params = new URLSearchParams(searchParams.toString());
+        if (remarks && remarks !== "all") {
+            params.set("remarks", remarks);
+        } else {
+            params.delete("remarks");
         }
         params.set("page", "1");
         router.push(`?${params.toString()}`);
@@ -936,7 +948,7 @@ export default function GradesPage() {
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto lg:flex-1 lg:justify-end items-center">
-                        {(search || filterCourse || filterSubject) && (
+                        {(search || filterCourse || filterSubject || filterRemarks) && (
                             <Button
                                 variant="ghost"
                                 onClick={clearFilters}
@@ -967,6 +979,19 @@ export default function GradesPage() {
                             placeholder="Filter by subject"
                             className="w-full sm:w-[220px]"
                             leftIcon={<ListFilter className="size-4" />}
+                        />
+
+                        <GenericCombobox
+                            value={filterRemarks}
+                            onValueChange={handleFilterRemarks}
+                            items={[
+                                { value: "Passed", label: "Passed" },
+                                { value: "Failed", label: "Failed" },
+                                { value: "Pending", label: "Pending" },
+                            ]}
+                            placeholder="Filter by remarks"
+                            className="w-full sm:w-[180px]"
+                            leftIcon={<IconCheck className="size-4" />}
                         />
                     </div>
                 </div>

@@ -11,6 +11,7 @@ export const gradeRoutes = new Elysia({ prefix: "/grades" })
             courseId: t.Optional(t.String()),
             subjectId: t.Optional(t.String()),
             search: t.Optional(t.String()),
+            remarks: t.Optional(t.String()),
         }),
         requireAuth: true
     })

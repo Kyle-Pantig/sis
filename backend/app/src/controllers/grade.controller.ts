@@ -1,11 +1,11 @@
 import { GradeService, CreateGradeData, UpdateGradeData } from "../services/grade.service";
 
 export class GradeController {
-    static async getGrades({ query }: { query: { page?: string; limit?: string; courseId?: string; subjectId?: string; search?: string } }) {
+    static async getGrades({ query }: { query: { page?: string; limit?: string; courseId?: string; subjectId?: string; search?: string; remarks?: string } }) {
         try {
             const page = parseInt(query.page || "1");
             const limit = parseInt(query.limit || "10");
-            return await GradeService.getAllGrades(page, limit, query.courseId, query.subjectId, query.search);
+            return await GradeService.getAllGrades(page, limit, query.courseId, query.subjectId, query.search, query.remarks);
         } catch (error) {
             console.error(error);
             return { error: "Failed to fetch grades" };

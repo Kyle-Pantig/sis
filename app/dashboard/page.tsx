@@ -259,6 +259,7 @@ function CourseDistribution() {
 
 // Recent Students List (Modified for sidebar fit)
 function RecentStudentsList() {
+  const router = useRouter();
   const { data, isLoading } = useQuery({
     queryKey: ["recent-students"],
     queryFn: () => studentsApi.getAll(1, 7),
@@ -291,6 +292,7 @@ function RecentStudentsList() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: i * 0.05 }}
           className="flex items-center gap-3 p-2 rounded-lg hover:bg-zinc-50 group-hover/bento:hover:bg-white/10 transition-colors cursor-pointer"
+          onClick={() => router.push(`/dashboard/students/${student.id}`)}
         >
           <div className="size-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">
             {student.firstName[0]}{student.lastName[0]}
@@ -398,7 +400,7 @@ export default function DashboardPage() {
           className="group/bento rounded-xl border border-zinc-200 bg-white p-5 transition-all duration-500 hover:bg-zinc-900 hover:shadow-2xl hover:border-zinc-800 cursor-pointer overflow-hidden relative"
           onClick={() => {
             if (stat.title === "Total Students") router.push("/dashboard/students");
-            if (stat.title === "Active Reservations") router.push("/dashboard/students");
+            if (stat.title === "Active Reservations") router.push("/dashboard/grades");
             if (stat.title === "Active Subjects") router.push("/dashboard/subjects");
           }}
         >
