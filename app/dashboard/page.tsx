@@ -115,9 +115,9 @@ function RecentActivityList() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
-  const { data: logs, isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["recent-audit-logs"],
-    queryFn: () => auditApi.getLogs(5),
+    queryFn: () => auditApi.getLogs(1, 5),
     enabled: isAdmin,
     refetchInterval: isAdmin ? 30000 : false,
   });
@@ -148,12 +148,11 @@ function RecentActivityList() {
     );
   }
 
-  const activityLogs = Array.isArray(logs) ? logs : [];
+  const activityLogs = data?.logs || [];
 
   return (
     <div className="space-y-4">
       {activityLogs.slice(0, 4).map((log: any, i: number) => {
-        const isUpdate = log.action.toLowerCase().includes("update") || log.action.toLowerCase().includes("patch");
         const isDelete = log.action.toLowerCase().includes("delete");
         const isCreate = log.action.toLowerCase().includes("create") || log.action.toLowerCase().includes("post") || log.action.toLowerCase().includes("import");
 
