@@ -36,12 +36,8 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
             return { user: null };
         }
     })
-    .get("/me", ({ user, set }: any) => {
-        if (!user) {
-            set.status = 401;
-            return { error: "Unauthorized" };
-        }
-        return user;
+    .get("/me", ({ user }: any) => {
+        return user || null;
     })
     .post("/logout", ({ cookie: { session } }: any) => {
         session.remove();
