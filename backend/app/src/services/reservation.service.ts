@@ -1,4 +1,5 @@
 import prisma from "../db";
+import { AuditService } from "./audit.service";
 
 export interface CreateReservationData {
     studentId: string;
@@ -6,6 +7,7 @@ export interface CreateReservationData {
 }
 
 export class SubjectReservationService {
+    // ... rest of the service methods
     static async getReservationsByStudent(studentId: string) {
         return await prisma.subjectReservation.findMany({
             where: { studentId },
@@ -19,7 +21,6 @@ export class SubjectReservationService {
     }
 
     static async getAvailableSubjectsForStudent(studentId: string) {
-        // Get the student's course
         const student = await prisma.student.findUnique({
             where: { id: studentId },
             select: { courseId: true },
@@ -33,7 +34,6 @@ export class SubjectReservationService {
             return [];
         }
 
-        // Get subjects from the student's course that are not already reserved
         const reservedSubjectIds = await prisma.subjectReservation.findMany({
             where: { studentId },
             select: { subjectId: true },
@@ -50,16 +50,15 @@ export class SubjectReservationService {
         });
     }
 
-    static async createReservation(data: CreateReservationData) {
-        // Optimize: Fetch all dependencies in parallel
+    static async createReservation(data: CreateReservationData, userId?: string) {
         const [student, subject, existing, admin] = await Promise.all([
             prisma.student.findUnique({
                 where: { id: data.studentId },
-                select: { courseId: true },
+                select: { id: true, studentNo: true, firstName: true, lastName: true, courseId: true },
             }),
             prisma.subject.findUnique({
                 where: { id: data.subjectId },
-                select: { courseId: true },
+                select: { id: true, code: true, courseId: true },
             }),
             prisma.subjectReservation.findUnique({
                 where: {
@@ -78,9 +77,8 @@ export class SubjectReservationService {
         if (subject.courseId !== student.courseId) throw new Error("Cannot reserve subject from a different course");
         if (existing) throw new Error("Subject already reserved");
 
-        // Execute writes atomically
-        return await prisma.$transaction(async (tx) => {
-            const reservation = await tx.subjectReservation.create({
+        const reservation = await prisma.$transaction(async (tx) => {
+            const res = await tx.subjectReservation.create({
                 data: {
                     studentId: data.studentId,
                     subjectId: data.subjectId,
@@ -91,11 +89,8 @@ export class SubjectReservationService {
                 },
             });
 
-            // Automatically create a "Pending" grade record
             if (admin) {
-                // We know courseId is present given the check above, but cast for TS safety
                 const courseIdString = student.courseId as string;
-
                 await tx.grade.upsert({
                     where: {
                         studentId_subjectId_courseId: {
@@ -104,7 +99,7 @@ export class SubjectReservationService {
                             courseId: courseIdString,
                         }
                     },
-                    update: {}, // Don't overwrite if it exists
+                    update: {},
                     create: {
                         studentId: data.studentId,
                         subjectId: data.subjectId,
@@ -115,15 +110,23 @@ export class SubjectReservationService {
                 });
             }
 
-            return reservation;
+            return res;
         });
+
+        if (userId) {
+            await AuditService.log(userId, "RESERVE_SUBJECT", "SubjectReservation", reservation.id, {
+                student: `${student.firstName} ${student.lastName} (${student.studentNo})`,
+                subject: subject.code
+            });
+        }
+
+        return reservation;
     }
 
-    static async bulkCreateReservations(studentId: string, subjectIds: string[]) {
-        // 1. Validate student
+    static async bulkCreateReservations(studentId: string, subjectIds: string[], userId?: string) {
         const student = await prisma.student.findUnique({
             where: { id: studentId },
-            select: { id: true, courseId: true },
+            select: { id: true, studentNo: true, firstName: true, lastName: true, courseId: true },
         });
 
         if (!student) throw new Error("Student not found");
@@ -132,19 +135,17 @@ export class SubjectReservationService {
         const admin = await prisma.user.findFirst();
         const adminId = admin?.id;
 
-        // 2. Fetch all valid subjects for this course (batch check)
         const subjects = await prisma.subject.findMany({
             where: {
                 id: { in: subjectIds },
                 courseId: student.courseId,
             },
-            select: { id: true },
+            select: { id: true, code: true },
         });
 
         const validSubjectIds = subjects.map(s => s.id);
         if (validSubjectIds.length === 0) return [];
 
-        // 3. Check existing reservations (batch check)
         const existingReservations = await prisma.subjectReservation.findMany({
             where: {
                 studentId,
@@ -158,9 +159,7 @@ export class SubjectReservationService {
 
         if (finalSubjectIds.length === 0) return [];
 
-        // 4. Perform bulk writes in a transaction
-        return await prisma.$transaction(async (tx) => {
-            // Create reservations
+        const results = await prisma.$transaction(async (tx) => {
             await tx.subjectReservation.createMany({
                 data: finalSubjectIds.map(subjectId => ({
                     studentId,
@@ -170,11 +169,8 @@ export class SubjectReservationService {
                 skipDuplicates: true,
             });
 
-            // Create pending grades
             if (adminId) {
-                // Ensure courseId is treated as string since we checked it above
                 const courseIdString = student.courseId as string;
-
                 await tx.grade.createMany({
                     data: finalSubjectIds.map(subjectId => ({
                         studentId,
@@ -187,7 +183,6 @@ export class SubjectReservationService {
                 });
             }
 
-            // Return the created records (fetching is fast enough here)
             return await tx.subjectReservation.findMany({
                 where: {
                     studentId,
@@ -195,30 +190,50 @@ export class SubjectReservationService {
                 },
             });
         });
+
+        if (userId && results.length > 0) {
+            await AuditService.log(userId, "RESERVE_SUBJECTS", "SubjectReservation", "bulk", {
+                student: `${student.firstName} ${student.lastName} (${student.studentNo})`,
+                count: results.length,
+                subjects: subjects.filter(s => finalSubjectIds.includes(s.id)).map(s => s.code)
+            });
+        }
+
+        return results;
     }
 
-    static async cancelReservation(id: string) {
-        return await prisma.subjectReservation.update({
+    static async cancelReservation(id: string, userId?: string) {
+        const reservation = await prisma.subjectReservation.update({
             where: { id },
             data: { status: "cancelled" },
+            include: {
+                student: true,
+                subject: true
+            }
         });
+
+        if (userId) {
+            await AuditService.log(userId, "CANCEL_RESERVATION", "SubjectReservation", id, {
+                student: `${reservation.student.firstName} ${reservation.student.lastName}`,
+                subject: reservation.subject.code
+            });
+        }
+
+        return reservation;
     }
 
-    static async deleteReservation(id: string) {
-        // Find the reservation first to get student/subject info
+    static async deleteReservation(id: string, userId?: string) {
         const reservation = await prisma.subjectReservation.findUnique({
             where: { id },
-            include: { student: true }
+            include: { student: true, subject: true }
         });
 
         if (!reservation) {
-            // Already gone or doesn't exist
             return await prisma.subjectReservation.deleteMany({ where: { id } });
         }
 
-        return await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx) => {
             if (reservation.student.courseId) {
-                // Remove the associated grade record
                 try {
                     await tx.grade.delete({
                         where: {
@@ -229,33 +244,33 @@ export class SubjectReservationService {
                             }
                         }
                     });
-                } catch (err) {
-                    // Ignore if grade record doesn't exist
-                }
+                } catch (err) { }
             }
 
             return await tx.subjectReservation.delete({
                 where: { id },
             });
         });
+
+        if (userId) {
+            await AuditService.log(userId, "REMOVE_RESERVATION", "SubjectReservation", id, {
+                student: `${reservation.student.firstName} ${reservation.student.lastName}`,
+                subject: reservation.subject.code
+            });
+        }
+
+        return result;
     }
 
-    static async bulkDeleteReservations(ids: string[]) {
-        // 1. Fetch info for grade deletion
+    static async bulkDeleteReservations(ids: string[], userId?: string) {
         const reservations = await prisma.subjectReservation.findMany({
             where: { id: { in: ids } },
-            include: { student: true },
+            include: { student: true, subject: true },
         });
 
         if (reservations.length === 0) return { success: true };
 
-        return await prisma.$transaction(async (tx) => {
-            // Delete associated grades
-            /* 
-               We construct an OR condition for composite keys. 
-               We must filter out any where courseId might be null to allow Type safety,
-               although logically reserved students should have a course.
-            */
+        await prisma.$transaction(async (tx) => {
             const gradesToDelete = reservations
                 .filter(r => r.student.courseId !== null)
                 .map(r => ({
@@ -272,12 +287,23 @@ export class SubjectReservationService {
                 });
             }
 
-            // Delete reservations
             await tx.subjectReservation.deleteMany({
                 where: { id: { in: ids } },
             });
 
             return { success: true };
         });
+
+        if (userId) {
+            await AuditService.log(userId, "REMOVE_RESERVATIONS", "SubjectReservation", "bulk", {
+                count: reservations.length,
+                details: reservations.map(r => ({
+                    student: `${r.student.firstName} ${r.student.lastName}`,
+                    subject: r.subject.code
+                }))
+            });
+        }
+
+        return { success: true };
     }
 }

@@ -162,6 +162,7 @@ export default function SubjectsPage() {
         onSuccess: (_, variables) => {
             toast.success(`Subject ${variables.mode === "create" ? "created" : "updated"} successfully`);
             queryClient.invalidateQueries({ queryKey: ["subjects"] });
+            queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
             setFormOpen(false);
         },
         onError: (error: any) => {
@@ -174,6 +175,7 @@ export default function SubjectsPage() {
         onSuccess: () => {
             toast.success("Subject deleted successfully");
             queryClient.invalidateQueries({ queryKey: ["subjects"] });
+            queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
             setDeleteOpen(false);
             setIsForceDelete(false);
         },
@@ -195,6 +197,7 @@ export default function SubjectsPage() {
                 });
             }
             queryClient.invalidateQueries({ queryKey: ["subjects"] });
+            queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
             setSelectedIds([]);
             setBulkDeleteOpen(false);
             setIsForceDelete(false);
@@ -207,6 +210,9 @@ export default function SubjectsPage() {
     // Form state
     const [formOpen, setFormOpen] = useState(false);
     const [formMode, setFormMode] = useState<"create" | "edit">("create");
+    const [checkingAvailability, setCheckingAvailability] = useState(false);
+    const [codeExists, setCodeExists] = useState(false);
+    const [titleExists, setTitleExists] = useState(false);
     const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
 
     // Delete state
@@ -240,6 +246,29 @@ export default function SubjectsPage() {
         },
     });
 
+    const checkAvailability = async (codeValue?: string, titleValue?: string, courseIdValue?: string) => {
+        const cId = courseIdValue || form.getValues("courseId");
+        const code = codeValue !== undefined ? codeValue : form.getValues("code");
+        const title = titleValue !== undefined ? titleValue : form.getValues("title");
+
+        if (!cId || (!code && !title)) {
+            setCodeExists(false);
+            setTitleExists(false);
+            return;
+        }
+
+        if (code.length >= 2 || title.length >= 3) {
+            try {
+                const res = await subjectsApi.checkAvailability(cId, code, title, selectedSubject?.id);
+                setCodeExists(!!res.codeExists);
+                setTitleExists(!!res.titleExists);
+            } catch (err) { }
+        } else {
+            setCodeExists(false);
+            setTitleExists(false);
+        }
+    };
+
     useEffect(() => {
         setTitle("Subject Management");
     }, [setTitle]);
@@ -258,6 +287,8 @@ export default function SubjectsPage() {
         setSelectedSubject(null);
         form.reset({ courseId: "", code: "", title: "", units: 3 });
         setFormMode("create");
+        setCodeExists(false);
+        setTitleExists(false);
         setFormOpen(true);
     }
 
@@ -270,6 +301,8 @@ export default function SubjectsPage() {
             units: subject.units,
         });
         setFormMode("edit");
+        setCodeExists(false);
+        setTitleExists(false);
         setFormOpen(true);
     }
 
@@ -279,6 +312,33 @@ export default function SubjectsPage() {
     }
 
     async function onSubmit(data: SubjectFormValues) {
+        // Final availability check before submitting
+        try {
+            setCheckingAvailability(true);
+            const res = await subjectsApi.checkAvailability(
+                data.courseId,
+                data.code,
+                data.title,
+                selectedSubject?.id
+            );
+
+            if (res.codeExists) {
+                setCodeExists(true);
+                toast.error("Subject code already exists for this course");
+                return;
+            }
+
+            if (res.titleExists) {
+                setTitleExists(true);
+                toast.error("Subject title already exists for this course");
+                return;
+            }
+        } catch (error) {
+            // If check fails, we might want to continue or show error
+        } finally {
+            setCheckingAvailability(false);
+        }
+
         await mutation.mutateAsync({
             mode: formMode,
             data,
@@ -718,7 +778,10 @@ export default function SubjectsPage() {
                                         <FormControl>
                                             <CourseCombobox
                                                 value={field.value}
-                                                onValueChange={field.onChange}
+                                                onValueChange={(val) => {
+                                                    field.onChange(val);
+                                                    checkAvailability(undefined, undefined, val);
+                                                }}
                                                 placeholder="Select a course"
                                                 className="w-full"
                                             />
@@ -737,10 +800,20 @@ export default function SubjectsPage() {
                                             <Input
                                                 placeholder="e.g., CS101"
                                                 {...field}
-                                                onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.toUpperCase();
+                                                    field.onChange(val);
+                                                    checkAvailability(val);
+                                                }}
                                             />
                                         </FormControl>
                                         <FormMessage />
+                                        {codeExists && (
+                                            <p className="text-[11px] font-medium text-red-500 mt-1 flex items-center gap-1">
+                                                <IconExclamationCircle className="size-3" />
+                                                This code is already used in this course.
+                                            </p>
+                                        )}
                                     </FormItem>
                                 )}
                             />
@@ -751,9 +824,22 @@ export default function SubjectsPage() {
                                     <FormItem>
                                         <FormLabel>Subject Title *</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="e.g., Introduction to Programming" {...field} />
+                                            <Input
+                                                placeholder="e.g., Introduction to Programming"
+                                                {...field}
+                                                onChange={(e) => {
+                                                    field.onChange(e.target.value);
+                                                    checkAvailability(undefined, e.target.value);
+                                                }}
+                                            />
                                         </FormControl>
                                         <FormMessage />
+                                        {titleExists && (
+                                            <p className="text-[11px] font-medium text-red-500 mt-1 flex items-center gap-1">
+                                                <IconExclamationCircle className="size-3" />
+                                                This title is already used in this course.
+                                            </p>
+                                        )}
                                     </FormItem>
                                 )}
                             />
@@ -771,19 +857,26 @@ export default function SubjectsPage() {
                                 )}
                             />
                             <DialogFooter className="pt-4">
-                                <Button type="button" variant="outline" onClick={() => setFormOpen(false)} disabled={isSubmitting}>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setFormOpen(false)}
+                                    disabled={isSubmitting || checkingAvailability}
+                                >
                                     Cancel
                                 </Button>
-                                <Button type="submit" disabled={isSubmitting} className="min-w-[100px]">
-                                    {isSubmitting ? (
+                                <Button
+                                    type="submit"
+                                    disabled={isSubmitting || checkingAvailability || codeExists || titleExists}
+                                    className="min-w-[100px]"
+                                >
+                                    {isSubmitting || checkingAvailability ? (
                                         <>
                                             <IconLoader2 className="size-4 mr-2 animate-spin" />
-                                            {formMode === "create" ? "Creating..." : "Saving..."}
+                                            {checkingAvailability ? "Checking..." : (formMode === "create" ? "Creating..." : "Saving...")}
                                         </>
-                                    ) : formMode === "create" ? (
-                                        "Create Subject"
                                     ) : (
-                                        "Save Changes"
+                                        formMode === "create" ? "Create Subject" : "Save Changes"
                                     )}
                                 </Button>
                             </DialogFooter>

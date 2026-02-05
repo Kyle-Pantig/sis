@@ -1,6 +1,16 @@
 import { CourseService, CreateCourseData, UpdateCourseData } from "../services/course.service";
 
 export class CourseController {
+    static async checkCourseCode({ query }: { query: { code: string } }) {
+        try {
+            const course = await CourseService.getCourseByCode(query.code);
+            return { exists: !!course };
+        } catch (error) {
+            console.error(error);
+            return { error: "Failed to check course code" };
+        }
+    }
+
     static async getCourses({ query }: { query: { page?: string; limit?: string; search?: string } }) {
         try {
             const page = parseInt(query.page || "1");
@@ -25,9 +35,15 @@ export class CourseController {
         }
     }
 
-    static async createCourse({ body, set }: { body: CreateCourseData; set: any }) {
+    static async createCourse(ctx: any) {
+        const { body, set, jwt, cookie: { session } } = ctx;
+        let user = ctx.user;
+        if (!user && session?.value) {
+            try { user = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
-            const course = await CourseService.createCourse(body);
+            const course = await CourseService.createCourse(body, user?.id);
             set.status = 201;
             return course;
         } catch (error: any) {
@@ -41,9 +57,15 @@ export class CourseController {
         }
     }
 
-    static async updateCourse({ params, body, set }: { params: { id: string }; body: UpdateCourseData; set: any }) {
+    static async updateCourse(ctx: any) {
+        const { params, body, set, jwt, cookie: { session } } = ctx;
+        let user = ctx.user;
+        if (!user && session?.value) {
+            try { user = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
-            const course = await CourseService.updateCourse(params.id, body);
+            const course = await CourseService.updateCourse(params.id, body, user?.id);
             return course;
         } catch (error: any) {
             console.error(error);
@@ -60,10 +82,16 @@ export class CourseController {
         }
     }
 
-    static async deleteCourse({ params, query, set }: { params: { id: string }; query: { force?: string }; set: any }) {
+    static async deleteCourse(ctx: any) {
+        const { params, query, set, jwt, cookie: { session } } = ctx;
+        let user = ctx.user;
+        if (!user && session?.value) {
+            try { user = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
             const force = query.force === "true";
-            await CourseService.deleteCourse(params.id, force);
+            await CourseService.deleteCourse(params.id, force, user?.id);
             return { success: true };
         } catch (error: any) {
             console.error(error);
@@ -80,9 +108,15 @@ export class CourseController {
         }
     }
 
-    static async bulkDeleteCourses({ body, set }: { body: { ids: string[]; force?: boolean }; set: any }) {
+    static async bulkDeleteCourses(ctx: any) {
+        const { body, set, jwt, cookie: { session } } = ctx;
+        let user = ctx.user;
+        if (!user && session?.value) {
+            try { user = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
-            const result = await CourseService.deleteCourses(body.ids, body.force);
+            const result = await CourseService.deleteCourses(body.ids, body.force, user?.id);
             return {
                 success: true,
                 deletedCount: result.deletedCount,

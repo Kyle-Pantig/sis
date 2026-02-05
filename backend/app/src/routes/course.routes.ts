@@ -4,6 +4,12 @@ import { authMiddleware } from "../middleware/auth.middleware";
 
 export const courseRoutes = new Elysia({ prefix: "/courses" })
     .use(authMiddleware)
+    .get("/check-code", (context: any) => CourseController.checkCourseCode(context), {
+        query: t.Object({
+            code: t.String(),
+        }),
+        requireAuth: true
+    })
     .get("/", (context: any) => CourseController.getCourses(context), {
         query: t.Object({
             page: t.Optional(t.String()),

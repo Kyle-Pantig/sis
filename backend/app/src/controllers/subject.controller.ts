@@ -1,6 +1,23 @@
 import { SubjectService, CreateSubjectData, UpdateSubjectData } from "../services/subject.service";
 
 export class SubjectController {
+    static async checkAvailability({ query }: { query: { courseId: string; code: string; title: string; excludeId?: string } }) {
+        try {
+            if (!query.courseId || (!query.code && !query.title)) {
+                return { error: "Missing required parameters" };
+            }
+            return await SubjectService.checkSubjectAvailability(
+                query.courseId,
+                query.code || "",
+                query.title || "",
+                query.excludeId
+            );
+        } catch (error) {
+            console.error(error);
+            return { error: "Failed to check subject availability" };
+        }
+    }
+
     static async getSubjects({ query }: { query: { page?: string; limit?: string; search?: string; courseId?: string } }) {
         try {
             const page = parseInt(query.page || "1");
@@ -34,9 +51,15 @@ export class SubjectController {
         }
     }
 
-    static async createSubject({ body, set }: { body: CreateSubjectData; set: any }) {
+    static async createSubject(ctx: any) {
+        const { body, set, jwt, cookie: { session } } = ctx;
+        let user = ctx.user;
+        if (!user && session?.value) {
+            try { user = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
-            const subject = await SubjectService.createSubject(body);
+            const subject = await SubjectService.createSubject(body, user?.id);
             set.status = 201;
             return subject;
         } catch (error: any) {
@@ -50,9 +73,15 @@ export class SubjectController {
         }
     }
 
-    static async updateSubject({ params, body, set }: { params: { id: string }; body: UpdateSubjectData; set: any }) {
+    static async updateSubject(ctx: any) {
+        const { params, body, set, jwt, cookie: { session } } = ctx;
+        let user = ctx.user;
+        if (!user && session?.value) {
+            try { user = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
-            const subject = await SubjectService.updateSubject(params.id, body);
+            const subject = await SubjectService.updateSubject(params.id, body, user?.id);
             return subject;
         } catch (error: any) {
             console.error(error);
@@ -69,10 +98,16 @@ export class SubjectController {
         }
     }
 
-    static async deleteSubject({ params, query, set }: { params: { id: string }; query: { force?: string }; set: any }) {
+    static async deleteSubject(ctx: any) {
+        const { params, query, set, jwt, cookie: { session } } = ctx;
+        let user = ctx.user;
+        if (!user && session?.value) {
+            try { user = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
             const force = query.force === "true";
-            await SubjectService.deleteSubject(params.id, force);
+            await SubjectService.deleteSubject(params.id, force, user?.id);
             return { success: true };
         } catch (error: any) {
             console.error(error);
@@ -89,9 +124,15 @@ export class SubjectController {
         }
     }
 
-    static async bulkDeleteSubjects({ body, set }: { body: { ids: string[]; force?: boolean }; set: any }) {
+    static async bulkDeleteSubjects(ctx: any) {
+        const { body, set, jwt, cookie: { session } } = ctx;
+        let user = ctx.user;
+        if (!user && session?.value) {
+            try { user = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
-            const result = await SubjectService.deleteSubjects(body.ids, body.force);
+            const result = await SubjectService.deleteSubjects(body.ids, body.force, user?.id);
             return {
                 success: true,
                 deletedCount: result.deletedCount,

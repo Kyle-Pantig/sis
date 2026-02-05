@@ -73,6 +73,7 @@ export const coursesApi = {
         if (search) params.set("search", search);
         return fetchApi(`/api/courses?${params.toString()}`);
     },
+    checkCode: (code: string) => fetchApi(`/api/courses/check-code?code=${encodeURIComponent(code)}`),
     getById: (id: string) => fetchApi(`/api/courses/${id}`),
     create: (data: any) => fetchApi("/api/courses", {
         method: "POST",
@@ -138,6 +139,13 @@ export const subjectsApi = {
         method: "DELETE",
         body: JSON.stringify({ ids, force }),
     }),
+    checkAvailability: (courseId: string, code?: string, title?: string, excludeId?: string) => {
+        const params = new URLSearchParams({ courseId });
+        if (code) params.set("code", code);
+        if (title) params.set("title", title);
+        if (excludeId) params.set("excludeId", excludeId);
+        return fetchApi(`/api/subjects/check-availability?${params.toString()}`);
+    },
 };
 
 export const gradesApi = {
@@ -194,10 +202,22 @@ export const usersApi = {
 };
 
 export const auditApi = {
-    getLogs: (limit: number = 50, entityId?: string) => {
-        const params = new URLSearchParams({ limit: String(limit) });
+    getLogs: (page: number = 1, limit: number = 50, search?: string, action?: string, entity?: string, entityId?: string) => {
+        const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+        if (search) params.set("search", search);
+        if (action) params.set("action", action);
+        if (entity) params.set("entity", entity);
         if (entityId) params.set("entityId", entityId);
         return fetchApi(`/api/audit?${params.toString()}`);
-    }
-};
-
+    },
+    getFilters: () => {
+        return fetchApi("/api/audit/filters");
+    },
+    delete: (id: string) => fetchApi(`/api/audit/${id}`, {
+        method: "DELETE"
+    }),
+    bulkDelete: (ids: string[]) => fetchApi("/api/audit/bulk", {
+        method: "DELETE",
+        body: JSON.stringify({ ids })
+    })
+}

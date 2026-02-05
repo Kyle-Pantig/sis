@@ -19,9 +19,15 @@ export class ReservationController {
         }
     }
 
-    static async createReservation({ body, set }: { body: CreateReservationData; set: any }) {
+    static async createReservation(ctx: any) {
+        const { body, set, jwt, cookie: { session } } = ctx;
+        let user = ctx.user;
+        if (!user && session?.value) {
+            try { user = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
-            const reservation = await SubjectReservationService.createReservation(body);
+            const reservation = await SubjectReservationService.createReservation(body, user?.id);
             set.status = 201;
             return reservation;
         } catch (error: any) {
@@ -31,9 +37,15 @@ export class ReservationController {
         }
     }
 
-    static async cancelReservation({ params, set }: { params: { id: string }; set: any }) {
+    static async cancelReservation(ctx: any) {
+        const { params, set, jwt, cookie: { session } } = ctx;
+        let user = ctx.user;
+        if (!user && session?.value) {
+            try { user = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
-            const reservation = await SubjectReservationService.cancelReservation(params.id);
+            const reservation = await SubjectReservationService.cancelReservation(params.id, user?.id);
             return reservation;
         } catch (error: any) {
             console.error(error);
@@ -46,9 +58,15 @@ export class ReservationController {
         }
     }
 
-    static async deleteReservation({ params, set }: { params: { id: string }; set: any }) {
+    static async deleteReservation(ctx: any) {
+        const { params, set, jwt, cookie: { session } } = ctx;
+        let user = ctx.user;
+        if (!user && session?.value) {
+            try { user = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
-            await SubjectReservationService.deleteReservation(params.id);
+            await SubjectReservationService.deleteReservation(params.id, user?.id);
             return { success: true };
         } catch (error: any) {
             console.error(error);
@@ -61,9 +79,15 @@ export class ReservationController {
         }
     }
 
-    static async bulkCreateReservations({ body, set }: { body: { studentId: string; subjectIds: string[] }; set: any }) {
+    static async bulkCreateReservations(ctx: any) {
+        const { body, set, jwt, cookie: { session } } = ctx;
+        let user = ctx.user;
+        if (!user && session?.value) {
+            try { user = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
-            const results = await SubjectReservationService.bulkCreateReservations(body.studentId, body.subjectIds);
+            const results = await SubjectReservationService.bulkCreateReservations(body.studentId, body.subjectIds, user?.id);
             set.status = 201;
             return results;
         } catch (error: any) {
@@ -73,9 +97,15 @@ export class ReservationController {
         }
     }
 
-    static async bulkDeleteReservations({ body, set }: { body: { ids: string[] }; set: any }) {
+    static async bulkDeleteReservations(ctx: any) {
+        const { body, set, jwt, cookie: { session } } = ctx;
+        let user = ctx.user;
+        if (!user && session?.value) {
+            try { user = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
-            await SubjectReservationService.bulkDeleteReservations(body.ids);
+            await SubjectReservationService.bulkDeleteReservations(body.ids, user?.id);
             return { success: true };
         } catch (error: any) {
             console.error(error);

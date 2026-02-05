@@ -4,6 +4,15 @@ import { authMiddleware } from "../middleware/auth.middleware";
 
 export const subjectRoutes = new Elysia({ prefix: "/subjects" })
     .use(authMiddleware)
+    .get("/check-availability", (context: any) => SubjectController.checkAvailability(context), {
+        query: t.Object({
+            courseId: t.String(),
+            code: t.Optional(t.String()),
+            title: t.Optional(t.String()),
+            excludeId: t.Optional(t.String()),
+        }),
+        requireAuth: true
+    })
     .get("/", (context: any) => SubjectController.getSubjects(context), {
         query: t.Object({
             page: t.Optional(t.String()),

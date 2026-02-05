@@ -1,4 +1,5 @@
 import prisma from "../db";
+import { AuditService } from "./audit.service";
 
 interface CreateStudentData {
     studentNo?: string;
@@ -20,6 +21,7 @@ interface UpdateStudentData {
 
 
 export class StudentService {
+    // ... rest of the service methods
     static async getAllStudents(page: number = 1, limit: number = 10, search?: string, courseId?: string) {
         const skip = (page - 1) * limit;
 
@@ -135,13 +137,13 @@ export class StudentService {
         return `${yearPrefix}-${formattedSequence}`;
     }
 
-    static async createStudent(data: CreateStudentData) {
+    static async createStudent(data: CreateStudentData, userId?: string) {
         let studentNo = data.studentNo;
         if (!studentNo) {
             studentNo = await this.generateStudentNo();
         }
 
-        return await prisma.student.create({
+        const result = await prisma.student.create({
             data: {
                 studentNo: studentNo,
                 firstName: data.firstName,
@@ -154,10 +156,29 @@ export class StudentService {
                 course: true,
             },
         });
+
+        if (userId) {
+            await AuditService.log(userId, "CREATE_STUDENT", "Student", result.id, {
+                studentNo: result.studentNo,
+                name: `${result.firstName} ${result.lastName}`,
+                course: result.course?.code
+            });
+        }
+
+        return result;
     }
 
-    static async updateStudent(id: string, data: UpdateStudentData) {
-        return await prisma.student.update({
+    static async updateStudent(id: string, data: UpdateStudentData, userId?: string) {
+        const existing = await prisma.student.findUnique({
+            where: { id },
+            include: { course: true }
+        });
+
+        if (!existing) {
+            throw new Error("Student not found");
+        }
+
+        const result = await prisma.student.update({
             where: { id },
             data: {
                 ...(data.studentNo && { studentNo: data.studentNo }),
@@ -171,21 +192,54 @@ export class StudentService {
                 course: true,
             },
         });
+
+        if (userId) {
+            const changes: any = {};
+            if (data.studentNo && data.studentNo !== existing.studentNo) changes.studentNo = { from: existing.studentNo, to: data.studentNo };
+            if (data.firstName && data.firstName !== existing.firstName) changes.firstName = { from: existing.firstName, to: data.firstName };
+            if (data.lastName && data.lastName !== existing.lastName) changes.lastName = { from: existing.lastName, to: data.lastName };
+            if (data.email !== undefined && data.email !== existing.email) changes.email = { from: existing.email, to: data.email };
+            if (data.courseId && data.courseId !== existing.courseId) changes.course = { from: existing.course?.code, to: result.course?.code };
+
+            if (Object.keys(changes).length > 0) {
+                await AuditService.log(userId, "UPDATE_STUDENT", "Student", id, changes);
+            }
+        }
+
+        return result;
     }
 
-    static async deleteStudent(id: string) {
-        return await prisma.student.delete({
+    static async deleteStudent(id: string, userId?: string) {
+        const result = await prisma.student.delete({
             where: { id },
         });
+
+        if (userId) {
+            await AuditService.log(userId, "DELETE_STUDENT", "Student", id, {
+                studentNo: result.studentNo,
+                name: `${result.firstName} ${result.lastName}`
+            });
+        }
+
+        return result;
     }
 
-    static async deleteStudents(ids: string[]) {
-        return await prisma.student.deleteMany({
+    static async deleteStudents(ids: string[], userId?: string) {
+        const result = await prisma.student.deleteMany({
             where: { id: { in: ids } },
         });
+
+        if (userId) {
+            await AuditService.log(userId, "DELETE_STUDENTS", "Student", "bulk", {
+                count: result.count,
+                ids
+            });
+        }
+
+        return result;
     }
 
-    static async bulkCreateStudents(students: { studentNo?: string; firstName: string; lastName: string; email?: string | null; birthDate: string; course: string }[]) {
+    static async bulkCreateStudents(students: { studentNo?: string; firstName: string; lastName: string; email?: string | null; birthDate: string; course: string }[], userId?: string) {
         const results = {
             success: 0,
             failed: 0,
@@ -317,9 +371,7 @@ export class StudentService {
         }
 
         // ============ PHASE 3: Create any new courses (batch) ============
-        // Common Philippine course code to full name mapping
         const courseCodeToName: Record<string, string> = {
-            // Engineering
             "BSCPE": "Bachelor of Science in Computer Engineering",
             "BSCE": "Bachelor of Science in Civil Engineering",
             "BSEE": "Bachelor of Science in Electrical Engineering",
@@ -327,41 +379,33 @@ export class StudentService {
             "BSME": "Bachelor of Science in Mechanical Engineering",
             "BSCHE": "Bachelor of Science in Chemical Engineering",
             "BSIE": "Bachelor of Science in Industrial Engineering",
-            // Information Technology
             "BSIT": "Bachelor of Science in Information Technology",
             "BSCS": "Bachelor of Science in Computer Science",
             "BSIS": "Bachelor of Science in Information Systems",
-            // Business
             "BSA": "Bachelor of Science in Accountancy",
             "BSAIS": "Bachelor of Science in Accounting Information System",
             "BSBA": "Bachelor of Science in Business Administration",
             "BSMA": "Bachelor of Science in Management Accounting",
             "BSHM": "Bachelor of Science in Hospitality Management",
             "BSTM": "Bachelor of Science in Tourism Management",
-            // Education
             "BEED": "Bachelor of Elementary Education",
             "BSED": "Bachelor of Secondary Education",
             "BTLED": "Bachelor of Technology and Livelihood Education",
-            // Health Sciences
             "BSN": "Bachelor of Science in Nursing",
             "BSMT": "Bachelor of Science in Medical Technology",
             "BSPT": "Bachelor of Science in Physical Therapy",
             "BSRT": "Bachelor of Science in Radiologic Technology",
             "BSPHARMA": "Bachelor of Science in Pharmacy",
             "BSP": "Bachelor of Science in Psychology",
-            // Arts and Sciences
             "AB": "Bachelor of Arts",
             "ABCOMM": "Bachelor of Arts in Communication",
             "ABPOLSCI": "Bachelor of Arts in Political Science",
             "ABENG": "Bachelor of Arts in English",
             "BSCRIM": "Bachelor of Science in Criminology",
             "BSSW": "Bachelor of Science in Social Work",
-            // Agriculture
             "BSAGRI": "Bachelor of Science in Agriculture",
             "BSFORESTRY": "Bachelor of Science in Forestry",
-            // Architecture
             "BSARCH": "Bachelor of Science in Architecture",
-            // Others
             "BSOA": "Bachelor of Science in Office Administration",
             "BSHRM": "Bachelor of Science in Hotel and Restaurant Management",
             "BSMLS": "Bachelor of Science in Medical Laboratory Science",
@@ -370,7 +414,7 @@ export class StudentService {
         if (newCoursesToCreate.size > 0) {
             const coursesToInsert = Array.from(newCoursesToCreate).map(code => ({
                 code: code,
-                name: courseCodeToName[code] || code, // Use full name if available, otherwise use code
+                name: courseCodeToName[code] || code,
                 description: courseCodeToName[code]
                     ? `${code} - Auto-created during student import`
                     : "Auto-created during student import",
@@ -382,7 +426,6 @@ export class StudentService {
                     skipDuplicates: true,
                 });
 
-                // Refresh course map after creating new courses
                 const updatedCourses = await prisma.course.findMany();
                 for (const course of updatedCourses) {
                     courseMap.set(course.code.toLowerCase(), course.id);
@@ -430,46 +473,37 @@ export class StudentService {
             try {
                 const result = await prisma.student.createMany({
                     data: studentsToCreate,
-                    skipDuplicates: true, // Skip any that somehow still conflict
+                    skipDuplicates: true,
                 });
                 results.success = result.count;
-
-                // If some were skipped due to duplicates, calculate failures
                 const skippedCount = studentsToCreate.length - result.count;
                 if (skippedCount > 0) {
                     results.failed += skippedCount;
-                    // Note: We can't easily identify which specific records failed with createMany
-                    // The duplicate check in Phase 2 should catch most cases
                 }
             } catch (error: any) {
                 console.error("Bulk insert error:", error);
-                // If batch insert fails completely, fall back to individual inserts
-                // This is a safety net but shouldn't normally happen
                 for (const student of studentsToCreate) {
                     try {
                         await prisma.student.create({ data: student });
                         results.success++;
                     } catch (innerError: any) {
                         results.failed++;
-                        let errorMessage = "Unknown error";
-                        if (innerError.code === "P2002") {
-                            const target = innerError.meta?.target;
-                            if (target?.includes("student_no") || target?.includes("studentNo")) {
-                                errorMessage = `Student number "${student.studentNo}" already exists`;
-                            } else if (target?.includes("email")) {
-                                errorMessage = `Email "${student.email}" already exists`;
-                            } else {
-                                errorMessage = "Duplicate record found";
-                            }
-                        }
                         results.errors.push({
-                            row: 0, // We lose row info in fallback
+                            row: 0,
                             studentNo: student.studentNo,
-                            error: errorMessage
+                            error: "Failed to insert"
                         });
                     }
                 }
             }
+        }
+
+        if (userId && (results.success > 0 || results.failed > 0)) {
+            await AuditService.log(userId, "IMPORT_STUDENTS", "Student", "bulk", {
+                success: results.success,
+                failed: results.failed,
+                total: students.length
+            });
         }
 
         return results;

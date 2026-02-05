@@ -18,16 +18,63 @@ export class AuditService {
         }
     }
 
-    static async getLogs(limit = 50) {
-        return await prisma.auditLog.findMany({
-            take: limit,
-            orderBy: { createdAt: "desc" },
-            include: {
-                user: {
-                    select: { email: true, role: true }
+    static async getLogs(page = 1, limit = 50, search?: string, action?: string, entity?: string) {
+        const skip = (page - 1) * limit;
+
+        const where: any = {};
+
+        const andFilters: any[] = [];
+
+        if (action) {
+            andFilters.push({ action: { equals: action, mode: "insensitive" } });
+        }
+
+        if (entity) {
+            andFilters.push({ entity: { equals: entity, mode: "insensitive" } });
+        }
+
+        if (search) {
+            andFilters.push({
+                OR: [
+                    { action: { contains: search, mode: "insensitive" } },
+                    { entity: { contains: search, mode: "insensitive" } },
+                    { entityId: { contains: search, mode: "insensitive" } },
+                    { details: { contains: search, mode: "insensitive" } },
+                    {
+                        user: {
+                            email: { contains: search, mode: "insensitive" }
+                        }
+                    }
+                ]
+            });
+        }
+
+        if (andFilters.length > 0) {
+            where.AND = andFilters;
+        }
+
+        const [logs, total] = await Promise.all([
+            prisma.auditLog.findMany({
+                where,
+                take: limit,
+                skip,
+                orderBy: { createdAt: "desc" },
+                include: {
+                    user: {
+                        select: { email: true, role: true }
+                    }
                 }
-            }
-        });
+            }),
+            prisma.auditLog.count({ where })
+        ]);
+
+        return {
+            logs,
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit)
+        };
     }
 
     static async getLogsByEntity(entityId: string) {
@@ -40,5 +87,37 @@ export class AuditService {
                 }
             }
         });
+    }
+
+    static async deleteLog(id: string) {
+        return await prisma.auditLog.delete({
+            where: { id }
+        });
+    }
+
+    static async deleteLogs(ids: string[]) {
+        return await prisma.auditLog.deleteMany({
+            where: { id: { in: ids } }
+        });
+    }
+
+    static async getFilters() {
+        const [actions, entities] = await Promise.all([
+            prisma.auditLog.findMany({
+                distinct: ["action"],
+                select: { action: true },
+                orderBy: { action: "asc" }
+            }),
+            prisma.auditLog.findMany({
+                distinct: ["entity"],
+                select: { entity: true },
+                orderBy: { entity: "asc" }
+            })
+        ]);
+
+        return {
+            actions: actions.map(a => a.action),
+            entities: entities.map(e => e.entity)
+        };
     }
 }

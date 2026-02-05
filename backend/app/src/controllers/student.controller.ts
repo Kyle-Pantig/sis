@@ -33,14 +33,25 @@ export class StudentController {
         }
     }
 
-    static async createStudent({ body, set }: any) {
+    static async createStudent(ctx: any) {
+        const { body, set, jwt, cookie: { session } } = ctx;
+        let user = ctx.user;
+        if (!user && session?.value) {
+            try { user = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
-            const student = await StudentService.createStudent(body);
+            const student = await StudentService.createStudent(body, user?.id);
             set.status = 201;
             return student;
         } catch (error: any) {
             console.error(error);
             if (error.code === 'P2002') {
+                const target = error.meta?.target;
+                if (target && (Array.isArray(target) ? target.join(',').includes('email') : String(target).includes('email'))) {
+                    set.status = 400;
+                    return { error: "Email address already exists" };
+                }
                 set.status = 400;
                 return { error: "Student number already exists" };
             }
@@ -49,9 +60,15 @@ export class StudentController {
         }
     }
 
-    static async updateStudent({ params, body, set }: any) {
+    static async updateStudent(ctx: any) {
+        const { params, body, set, jwt, cookie: { session } } = ctx;
+        let user = ctx.user;
+        if (!user && session?.value) {
+            try { user = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
-            const student = await StudentService.updateStudent(params.id, body);
+            const student = await StudentService.updateStudent(params.id, body, user?.id);
             return student;
         } catch (error: any) {
             console.error(error);
@@ -61,7 +78,7 @@ export class StudentController {
             }
             if (error.code === 'P2002') {
                 const target = error.meta?.target;
-                if (target && target.includes('email')) {
+                if (target && (Array.isArray(target) ? target.join(',').includes('email') : String(target).includes('email'))) {
                     set.status = 400;
                     return { error: "Email address already exists" };
                 }
@@ -73,9 +90,15 @@ export class StudentController {
         }
     }
 
-    static async deleteStudent({ params, set }: any) {
+    static async deleteStudent(ctx: any) {
+        const { params, set, jwt, cookie: { session } } = ctx;
+        let user = ctx.user;
+        if (!user && session?.value) {
+            try { user = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
-            await StudentService.deleteStudent(params.id);
+            await StudentService.deleteStudent(params.id, user?.id);
             return { message: "Student deleted successfully" };
         } catch (error: any) {
             console.error(error);
@@ -88,9 +111,15 @@ export class StudentController {
         }
     }
 
-    static async deleteStudents({ body, set }: { body: { ids: string[] }; set: any }) {
+    static async deleteStudents(ctx: any) {
+        const { body, set, jwt, cookie: { session } } = ctx;
+        let user = ctx.user;
+        if (!user && session?.value) {
+            try { user = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
-            const result = await StudentService.deleteStudents(body.ids);
+            const result = await StudentService.deleteStudents(body.ids, user?.id);
             return { count: result.count };
         } catch (error: any) {
             console.error(error);
@@ -99,14 +128,20 @@ export class StudentController {
         }
     }
 
-    static async importStudents({ body, set }: { body: { students: any[] }; set: any }) {
+    static async importStudents(ctx: any) {
+        const { body, set, jwt, cookie: { session } } = ctx;
+        let user = ctx.user;
+        if (!user && session?.value) {
+            try { user = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
             if (!body.students || !Array.isArray(body.students) || body.students.length === 0) {
                 set.status = 400;
                 return { error: "No students data provided" };
             }
 
-            const result = await StudentService.bulkCreateStudents(body.students);
+            const result = await StudentService.bulkCreateStudents(body.students, user?.id);
             return result;
         } catch (error: any) {
             console.error(error);

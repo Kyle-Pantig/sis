@@ -151,6 +151,7 @@ export default function CoursesPage() {
         onSuccess: (data, variables) => {
             toast.success(`Course ${variables.mode === "create" ? "created" : "updated"} successfully`);
             queryClient.invalidateQueries({ queryKey: ["courses"] });
+            queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
             // Also invalidate dashboard stats
             queryClient.invalidateQueries({ queryKey: ["summary-stats"] });
             queryClient.invalidateQueries({ queryKey: ["course-stats"] });
@@ -167,6 +168,7 @@ export default function CoursesPage() {
         onSuccess: () => {
             toast.success("Course deleted successfully");
             queryClient.invalidateQueries({ queryKey: ["courses"] });
+            queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
             // Also invalidate dashboard and course list stats
             queryClient.invalidateQueries({ queryKey: ["summary-stats"] });
             queryClient.invalidateQueries({ queryKey: ["course-stats"] });
@@ -192,6 +194,7 @@ export default function CoursesPage() {
                 });
             }
             queryClient.invalidateQueries({ queryKey: ["courses"] });
+            queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
             // Also invalidate dashboard and course list stats
             queryClient.invalidateQueries({ queryKey: ["summary-stats"] });
             queryClient.invalidateQueries({ queryKey: ["course-stats"] });
@@ -258,10 +261,15 @@ export default function CoursesPage() {
         }
     }, [searchParams, formOpen, router]);
 
+    // Validation state
+    const [checkingCode, setCheckingCode] = useState(false);
+    const [codeExists, setCodeExists] = useState(false);
+
     function handleCreate() {
         setSelectedCourse(null);
         form.reset({ code: "", name: "", description: "" });
         setFormMode("create");
+        setCodeExists(false);
         setFormOpen(true);
     }
 
@@ -273,6 +281,7 @@ export default function CoursesPage() {
             description: course.description || "",
         });
         setFormMode("edit");
+        setCodeExists(false);
         setFormOpen(true);
     }
 
@@ -282,6 +291,24 @@ export default function CoursesPage() {
     }
 
     async function onSubmit(data: CourseFormValues) {
+        if (formMode === "create") {
+            setCheckingCode(true);
+            try {
+                const check = await coursesApi.checkCode(data.code);
+                if (check.exists) {
+                    toast.error("Course code already exists", {
+                        description: `A course with code "${data.code}" is already in the system.`,
+                    });
+                    setCheckingCode(false);
+                    return;
+                }
+            } catch (err) {
+                // Ignore check errors and proceed to let backend handle it
+            } finally {
+                setCheckingCode(false);
+            }
+        }
+
         await mutation.mutateAsync({
             mode: formMode,
             data,
@@ -733,11 +760,26 @@ export default function CoursesPage() {
                                                         // Custom code but name still shows a known course name - clear it
                                                         form.setValue("name", "");
                                                     }
+
+                                                    // Real-time check if code exists (only in create mode)
+                                                    if (formMode === "create" && code.trim().length >= 2) {
+                                                        coursesApi.checkCode(code).then(res => {
+                                                            setCodeExists(!!res.exists);
+                                                        }).catch(() => { });
+                                                    } else {
+                                                        setCodeExists(false);
+                                                    }
                                                 }}
                                                 placeholder="Select or type course code..."
                                             />
                                         </FormControl>
                                         <FormMessage />
+                                        {codeExists && (
+                                            <p className="text-[11px] font-medium text-red-500 mt-1 flex items-center gap-1">
+                                                <IconExclamationCircle className="size-3" />
+                                                This course code is already registered in the system.
+                                            </p>
+                                        )}
                                     </FormItem>
                                 )}
                             />
@@ -779,15 +821,15 @@ export default function CoursesPage() {
                                     type="button"
                                     variant="outline"
                                     onClick={() => setFormOpen(false)}
-                                    disabled={isSubmitting}
+                                    disabled={isSubmitting || checkingCode}
                                 >
                                     Cancel
                                 </Button>
-                                <Button type="submit" disabled={isSubmitting} className="min-w-[100px]">
-                                    {isSubmitting ? (
+                                <Button type="submit" disabled={isSubmitting || checkingCode || codeExists} className="min-w-[100px]">
+                                    {isSubmitting || checkingCode ? (
                                         <>
                                             <IconLoader2 className="size-4 mr-2 animate-spin" />
-                                            {formMode === "create" ? "Creating..." : "Saving..."}
+                                            {checkingCode ? "Checking..." : (formMode === "create" ? "Creating..." : "Saving...")}
                                         </>
                                     ) : (
                                         formMode === "create" ? "Create Course" : "Save Changes"

@@ -1,5 +1,6 @@
 import prisma from "../db";
 import { EmailService } from "../services/email.service";
+import { AuditService } from "../services/audit.service";
 
 export const UserController = {
     // Get all encoders
@@ -45,11 +46,24 @@ export const UserController = {
     },
 
     // Delete invitation
-    deleteInvitation: async ({ params: { id } }: any) => {
+    deleteInvitation: async (ctx: any) => {
+        const { params: { id }, jwt, cookie: { session } } = ctx;
+        let currentUser = ctx.user;
+        if (!currentUser && session?.value) {
+            try { currentUser = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
-            await prisma.invitation.delete({
+            const invitation = await prisma.invitation.delete({
                 where: { id },
             });
+
+            if (currentUser?.id) {
+                await AuditService.log(currentUser.id, "REVOKE_INVITATION", "Invitation", id, {
+                    email: invitation.email
+                });
+            }
+
             return { message: "Invitation revoked successfully" };
         } catch (error) {
             console.error("Error deleting invitation:", error);
@@ -58,8 +72,12 @@ export const UserController = {
     },
 
     // Invite a new encoder
-    inviteEncoder: async ({ body }: any) => {
-        const { email } = body;
+    inviteEncoder: async (ctx: any) => {
+        const { body: { email }, jwt, cookie: { session } } = ctx;
+        let currentUser = ctx.user;
+        if (!currentUser && session?.value) {
+            try { currentUser = await jwt.verify(session.value); } catch (e) { }
+        }
 
         try {
             // check if email exists
@@ -79,7 +97,7 @@ export const UserController = {
             const token = crypto.randomUUID();
             const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-            await prisma.invitation.create({
+            const invitation = await prisma.invitation.create({
                 data: {
                     email,
                     token,
@@ -90,6 +108,12 @@ export const UserController = {
 
             await EmailService.sendInvitation(email, token);
 
+            if (currentUser?.id) {
+                await AuditService.log(currentUser.id, "INVITE_ENCODER", "Invitation", invitation.id, {
+                    email
+                });
+            }
+
             return { message: "Invitation sent successfully" };
         } catch (error) {
             console.error("Error inviting encoder:", error);
@@ -98,11 +122,15 @@ export const UserController = {
     },
 
     // Toggle encoder active status (Deactivate/Activate)
-    toggleStatus: async ({ params: { id }, body }: any) => {
-        const { isActive } = body;
+    toggleStatus: async (ctx: any) => {
+        const { params: { id }, body: { isActive }, jwt, cookie: { session } } = ctx;
+        let currentUser = ctx.user;
+        if (!currentUser && session?.value) {
+            try { currentUser = await jwt.verify(session.value); } catch (e) { }
+        }
 
         try {
-            const user = await prisma.user.update({
+            const updatedUser = await prisma.user.update({
                 where: { id },
                 data: { isActive },
                 select: {
@@ -111,7 +139,15 @@ export const UserController = {
                     isActive: true,
                 },
             });
-            return user;
+
+            if (currentUser?.id) {
+                await AuditService.log(currentUser.id, "TOGGLE_ENCODER_STATUS", "User", id, {
+                    email: updatedUser.email,
+                    active: isActive
+                });
+            }
+
+            return updatedUser;
         } catch (error) {
             console.error("Error updating user status:", error);
             return { error: "Failed to update user status" };
@@ -119,9 +155,22 @@ export const UserController = {
     },
 
     // Delete encoder
-    deleteEncoder: async ({ params: { id } }: any) => {
+    deleteEncoder: async (ctx: any) => {
+        const { params: { id }, jwt, cookie: { session } } = ctx;
+        let currentUser = ctx.user;
+        if (!currentUser && session?.value) {
+            try { currentUser = await jwt.verify(session.value); } catch (e) { }
+        }
+
         try {
             // Check if encoder has associated grades to prevent foreign key errors
+            const encoder = await prisma.user.findUnique({
+                where: { id },
+                select: { id: true, email: true }
+            });
+
+            if (!encoder) return { error: "Encoder not found" };
+
             const gradesCount = await prisma.grade.count({
                 where: { encodedByUserId: id },
             });
@@ -133,6 +182,12 @@ export const UserController = {
             await prisma.user.delete({
                 where: { id },
             });
+
+            if (currentUser?.id) {
+                await AuditService.log(currentUser.id, "DELETE_ENCODER", "User", id, {
+                    email: encoder.email
+                });
+            }
 
             return { message: "Encoder deleted successfully" };
         } catch (error) {

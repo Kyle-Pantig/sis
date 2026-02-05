@@ -1,4 +1,5 @@
 import prisma from "../db";
+import { AuditService } from "./audit.service";
 
 export interface CreateCourseData {
     code: string;
@@ -13,6 +14,7 @@ export interface UpdateCourseData {
 }
 
 export class CourseService {
+    // ... rest of the service methods
     static async getAllCourses(page: number = 1, limit: number = 10, search?: string) {
         const skip = (page - 1) * limit;
 
@@ -54,6 +56,12 @@ export class CourseService {
         };
     }
 
+    static async getCourseByCode(code: string) {
+        return await prisma.course.findUnique({
+            where: { code }
+        });
+    }
+
     static async getCourseById(id: string) {
         return await prisma.course.findUnique({
             where: { id },
@@ -69,59 +77,93 @@ export class CourseService {
         });
     }
 
-    static async createCourse(data: CreateCourseData) {
-        return await prisma.course.create({
+    static async createCourse(data: CreateCourseData, userId?: string) {
+        const result = await prisma.course.create({
             data: {
                 code: data.code,
                 name: data.name,
                 description: data.description,
             },
         });
+
+        if (userId) {
+            await AuditService.log(userId, "CREATE_COURSE", "Course", result.id, {
+                code: result.code,
+                name: result.name
+            });
+        }
+
+        return result;
     }
 
-    static async updateCourse(id: string, data: UpdateCourseData) {
-        return await prisma.course.update({
+    static async updateCourse(id: string, data: UpdateCourseData, userId?: string) {
+        const existing = await prisma.course.findUnique({
+            where: { id }
+        });
+
+        if (!existing) {
+            throw new Error("Course not found");
+        }
+
+        const result = await prisma.course.update({
             where: { id },
             data,
         });
+
+        if (userId) {
+            const changes: any = {};
+            if (data.code && data.code !== existing.code) changes.code = { from: existing.code, to: data.code };
+            if (data.name && data.name !== existing.name) changes.name = { from: existing.name, to: data.name };
+            if (data.description !== undefined && data.description !== existing.description) changes.description = { from: existing.description, to: data.description };
+
+            if (Object.keys(changes).length > 0) {
+                await AuditService.log(userId, "UPDATE_COURSE", "Course", id, changes);
+            }
+        }
+
+        return result;
     }
 
-    static async deleteCourse(id: string, force: boolean = false) {
+    static async deleteCourse(id: string, force: boolean = false, userId?: string) {
         if (force) {
-            return await prisma.$transaction(async (tx) => {
-                // 1. Get all subjects for this course
+            const result = await prisma.$transaction(async (tx) => {
+                // ... same force delete logic ...
                 const subjects = await tx.subject.findMany({
                     where: { courseId: id },
                     select: { id: true },
                 });
                 const subjectIds = subjects.map((s) => s.id);
 
-                // 2. Delete all grades for these subjects
                 await tx.grade.deleteMany({
                     where: { subjectId: { in: subjectIds } },
                 });
 
-                // 3. Delete all subject reservations for these subjects
                 await tx.subjectReservation.deleteMany({
                     where: { subjectId: { in: subjectIds } },
                 });
 
-                // 4. Delete all subjects
                 await tx.subject.deleteMany({
                     where: { courseId: id },
                 });
 
-                // 5. Unenroll all students (set courseId to null instead of deleting)
                 await tx.student.updateMany({
                     where: { courseId: id },
                     data: { courseId: null },
                 });
 
-                // 6. Finally delete the course
                 return await tx.course.delete({
                     where: { id },
                 });
             });
+
+            if (userId) {
+                await AuditService.log(userId, "DELETE_COURSE", "Course", id, {
+                    code: result.code,
+                    force: "Yes"
+                });
+            }
+
+            return result;
         }
 
         // Standard delete: only if no students
@@ -133,7 +175,7 @@ export class CourseService {
                     { subjects: { some: {} } },
                 ],
             },
-            select: { code: true },
+            select: { id: true, code: true },
         });
 
         if (courseWithDeps) {
@@ -142,48 +184,61 @@ export class CourseService {
             throw error;
         }
 
-        return await prisma.course.delete({
+        const result = await prisma.course.delete({
             where: { id },
         });
+
+        if (userId) {
+            await AuditService.log(userId, "DELETE_COURSE", "Course", id, {
+                code: result.code,
+                force: "No"
+            });
+        }
+
+        return result;
     }
 
-    static async deleteCourses(ids: string[], force: boolean = false) {
+    static async deleteCourses(ids: string[], force: boolean = false, userId?: string) {
         if (force) {
-            return await prisma.$transaction(async (tx) => {
-                // 1. Get all subjects for these courses
+            const result = await prisma.$transaction(async (tx) => {
                 const subjects = await tx.subject.findMany({
                     where: { courseId: { in: ids } },
                     select: { id: true },
                 });
                 const subjectIds = subjects.map((s) => s.id);
 
-                // 2. Delete all grades
                 await tx.grade.deleteMany({
                     where: { subjectId: { in: subjectIds } },
                 });
 
-                // 3. Delete all reservations
                 await tx.subjectReservation.deleteMany({
                     where: { subjectId: { in: subjectIds } },
                 });
 
-                // 4. Delete all subjects
                 await tx.subject.deleteMany({
                     where: { courseId: { in: ids } },
                 });
 
-                // 5. Unenroll all students (set courseId to null instead of deleting)
                 await tx.student.updateMany({
                     where: { courseId: { in: ids } },
                     data: { courseId: null },
                 });
 
-                // 6. Delete courses
-                const result = await tx.course.deleteMany({
+                const delResult = await tx.course.deleteMany({
                     where: { id: { in: ids } },
                 });
-                return { deletedCount: result.count, skippedCount: 0, skippedCodes: [] };
+                return { deletedCount: delResult.count, skippedCount: 0, skippedCodes: [] };
             });
+
+            if (userId) {
+                await AuditService.log(userId, "DELETE_COURSES", "Course", "bulk", {
+                    count: result.deletedCount,
+                    ids,
+                    force: "Yes"
+                });
+            }
+
+            return result;
         }
 
         // Standard delete: skip courses with deputies
@@ -203,10 +258,19 @@ export class CourseService {
 
         let deletedCount = 0;
         if (idsToDelete.length > 0) {
-            const result = await prisma.course.deleteMany({
+            const res = await prisma.course.deleteMany({
                 where: { id: { in: idsToDelete } },
             });
-            deletedCount = result.count;
+            deletedCount = res.count;
+        }
+
+        if (userId && deletedCount > 0) {
+            await AuditService.log(userId, "DELETE_COURSES", "Course", "bulk", {
+                deletedCount,
+                skippedCount: coursesWithDeps.length,
+                skippedCodes: coursesWithDeps.map((c) => c.code),
+                force: "No"
+            });
         }
 
         return {

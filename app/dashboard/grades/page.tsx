@@ -319,6 +319,7 @@ export default function GradesPage() {
         onSuccess: () => {
             toast.success("Grade updated successfully");
             queryClient.invalidateQueries({ queryKey: ["grades"] });
+            queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
             setEditingId(null);
             clearDeepLinkMetadata();
         },
@@ -339,6 +340,7 @@ export default function GradesPage() {
         onSuccess: () => {
             toast.success("Grade saved successfully");
             queryClient.invalidateQueries({ queryKey: ["grades"] });
+            queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
             setAddOpen(false);
             form.reset();
             clearDeepLinkMetadata();

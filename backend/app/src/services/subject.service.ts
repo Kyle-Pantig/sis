@@ -1,4 +1,5 @@
 import prisma from "../db";
+import { AuditService } from "./audit.service";
 
 export interface CreateSubjectData {
     courseId: string;
@@ -14,6 +15,7 @@ export interface UpdateSubjectData {
 }
 
 export class SubjectService {
+    // ... rest of the service methods
     static async getAllSubjects(page: number = 1, limit: number = 10, search?: string, courseId?: string) {
         const skip = (page - 1) * limit;
 
@@ -81,6 +83,20 @@ export class SubjectService {
             totalPages: Math.ceil(total / limit),
         };
     }
+    static async getSubjectsByCourse(courseId: string) {
+        return await prisma.subject.findMany({
+            where: { courseId },
+            orderBy: { code: "asc" },
+            include: {
+                _count: {
+                    select: {
+                        subjectReservations: true,
+                        grades: true
+                    }
+                }
+            }
+        });
+    }
 
     static async getSubjectById(id: string) {
         return await prisma.subject.findUnique({
@@ -97,14 +113,31 @@ export class SubjectService {
         });
     }
 
-    static async getSubjectsByCourse(courseId: string) {
-        return await prisma.subject.findMany({
-            where: { courseId },
-            orderBy: { code: "asc" },
-        });
+    static async checkSubjectAvailability(courseId: string, code: string, title: string, excludeId?: string) {
+        const [existingCode, existingTitle] = await Promise.all([
+            prisma.subject.findFirst({
+                where: {
+                    courseId,
+                    code: { equals: code.toUpperCase() },
+                    ...(excludeId && { id: { not: excludeId } })
+                }
+            }),
+            prisma.subject.findFirst({
+                where: {
+                    courseId,
+                    title: { equals: title, mode: "insensitive" },
+                    ...(excludeId && { id: { not: excludeId } })
+                }
+            })
+        ]);
+
+        return {
+            codeExists: !!existingCode,
+            titleExists: !!existingTitle
+        };
     }
 
-    static async createSubject(data: CreateSubjectData) {
+    static async createSubject(data: CreateSubjectData, userId?: string) {
         // Validation: Unique by (courseId, title)
         const existingTitle = await prisma.subject.findFirst({
             where: {
@@ -117,7 +150,7 @@ export class SubjectService {
             throw new Error(`Subject with title "${data.title}" already exists for this course.`);
         }
 
-        return await prisma.subject.create({
+        const result = await prisma.subject.create({
             data: {
                 courseId: data.courseId,
                 code: data.code.toUpperCase(),
@@ -128,26 +161,42 @@ export class SubjectService {
                 course: true,
             },
         });
+
+        if (userId) {
+            await AuditService.log(userId, "CREATE_SUBJECT", "Subject", result.id, {
+                code: result.code,
+                title: result.title,
+                course: result.course.code
+            });
+        }
+
+        return result;
     }
 
-    static async updateSubject(id: string, data: UpdateSubjectData) {
+    static async updateSubject(id: string, data: UpdateSubjectData, userId?: string) {
+        const existing = await prisma.subject.findUnique({
+            where: { id },
+            include: { course: true }
+        });
+
+        if (!existing) {
+            throw new Error("Subject not found");
+        }
+
         if (data.title) {
-            const existing = await prisma.subject.findUnique({ where: { id } });
-            if (existing) {
-                const duplicate = await prisma.subject.findFirst({
-                    where: {
-                        courseId: existing.courseId,
-                        title: { equals: data.title, mode: "insensitive" },
-                        id: { not: id }
-                    }
-                });
-                if (duplicate) {
-                    throw new Error(`Another subject with title "${data.title}" already exists for this course.`);
+            const duplicate = await prisma.subject.findFirst({
+                where: {
+                    courseId: existing.courseId,
+                    title: { equals: data.title, mode: "insensitive" },
+                    id: { not: id }
                 }
+            });
+            if (duplicate) {
+                throw new Error(`Another subject with title "${data.title}" already exists for this course.`);
             }
         }
 
-        return await prisma.subject.update({
+        const result = await prisma.subject.update({
             where: { id },
             data: {
                 ...(data.code && { code: data.code.toUpperCase() }),
@@ -158,11 +207,24 @@ export class SubjectService {
                 course: true,
             },
         });
+
+        if (userId) {
+            const changes: any = {};
+            if (data.code && data.code.toUpperCase() !== existing.code) changes.code = { from: existing.code, to: data.code.toUpperCase() };
+            if (data.title && data.title !== existing.title) changes.title = { from: existing.title, to: data.title };
+            if (data.units !== undefined && data.units !== existing.units) changes.units = { from: existing.units, to: data.units };
+
+            if (Object.keys(changes).length > 0) {
+                await AuditService.log(userId, "UPDATE_SUBJECT", "Subject", id, changes);
+            }
+        }
+
+        return result;
     }
 
-    static async deleteSubject(id: string, force: boolean = false) {
+    static async deleteSubject(id: string, force: boolean = false, userId?: string) {
         if (force) {
-            return await prisma.$transaction(async (tx) => {
+            const result = await prisma.$transaction(async (tx) => {
                 await tx.grade.deleteMany({
                     where: { subjectId: id },
                 });
@@ -171,8 +233,18 @@ export class SubjectService {
                 });
                 return await tx.subject.delete({
                     where: { id },
+                    include: { course: true }
                 });
             });
+
+            if (userId) {
+                await AuditService.log(userId, "DELETE_SUBJECT", "Subject", id, {
+                    code: result.code,
+                    force: "Yes"
+                });
+            }
+
+            return result;
         }
 
         // Check for dependencies (Reservations or Grades)
@@ -193,31 +265,44 @@ export class SubjectService {
             throw error;
         }
 
-        return await prisma.subject.delete({
+        const result = await prisma.subject.delete({
             where: { id },
         });
+
+        if (userId) {
+            await AuditService.log(userId, "DELETE_SUBJECT", "Subject", id, {
+                code: result.code,
+                force: "No"
+            });
+        }
+
+        return result;
     }
 
-    static async deleteSubjects(ids: string[], force: boolean = false) {
+    static async deleteSubjects(ids: string[], force: boolean = false, userId?: string) {
         if (force) {
-            // Force delete: remove dependencies first
-            await prisma.$transaction([
-                prisma.grade.deleteMany({
+            const result = await prisma.$transaction(async (tx) => {
+                await tx.grade.deleteMany({
                     where: { subjectId: { in: ids } },
-                }),
-                prisma.subjectReservation.deleteMany({
+                });
+                await tx.subjectReservation.deleteMany({
                     where: { subjectId: { in: ids } },
-                }),
-                prisma.subject.deleteMany({
+                });
+                const delResult = await tx.subject.deleteMany({
                     where: { id: { in: ids } },
-                }),
-            ]);
+                });
+                return { deletedCount: delResult.count, skippedCount: 0, skippedCodes: [] };
+            });
 
-            return {
-                deletedCount: ids.length,
-                skippedCount: 0,
-                skippedCodes: [],
-            };
+            if (userId) {
+                await AuditService.log(userId, "DELETE_SUBJECTS", "Subject", "bulk", {
+                    count: result.deletedCount,
+                    ids,
+                    force: "Yes"
+                });
+            }
+
+            return result;
         }
 
         // Standard delete: skip subjects with dependencies
@@ -237,10 +322,19 @@ export class SubjectService {
 
         let deletedCount = 0;
         if (idsToDelete.length > 0) {
-            const result = await prisma.subject.deleteMany({
+            const res = await prisma.subject.deleteMany({
                 where: { id: { in: idsToDelete } },
             });
-            deletedCount = result.count;
+            deletedCount = res.count;
+        }
+
+        if (userId && deletedCount > 0) {
+            await AuditService.log(userId, "DELETE_SUBJECTS", "Subject", "bulk", {
+                deletedCount,
+                skippedCount: subjectsWithDeps.length,
+                skippedCodes: subjectsWithDeps.map((s) => s.code),
+                force: "No"
+            });
         }
 
         return {

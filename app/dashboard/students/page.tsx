@@ -147,6 +147,7 @@ export default function StudentsPage() {
 
             toast.success(`Student ${variables.mode === "create" ? "created" : "updated"} successfully`);
             queryClient.invalidateQueries({ queryKey: ["students"] });
+            queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
             // Also invalidate dashboard stats (for new students or course changes)
             queryClient.invalidateQueries({ queryKey: ["summary-stats"] });
             queryClient.invalidateQueries({ queryKey: ["course-stats"] });
@@ -167,6 +168,7 @@ export default function StudentsPage() {
         onSuccess: () => {
             toast.success("Student updated");
             queryClient.invalidateQueries({ queryKey: ["students"] });
+            queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
             setEditingId(null);
         },
         onError: (error: any) => {
@@ -179,6 +181,7 @@ export default function StudentsPage() {
         onSuccess: () => {
             toast.success("Student deleted successfully");
             queryClient.invalidateQueries({ queryKey: ["students"] });
+            queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
             // Also invalidate dashboard stats
             queryClient.invalidateQueries({ queryKey: ["summary-stats"] });
             queryClient.invalidateQueries({ queryKey: ["course-stats"] });
@@ -195,6 +198,7 @@ export default function StudentsPage() {
         onSuccess: (result: any) => {
             toast.success(`Deleted ${result.count} students`);
             queryClient.invalidateQueries({ queryKey: ["students"] });
+            queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
             // Also invalidate dashboard stats
             queryClient.invalidateQueries({ queryKey: ["summary-stats"] });
             queryClient.invalidateQueries({ queryKey: ["course-stats"] });
