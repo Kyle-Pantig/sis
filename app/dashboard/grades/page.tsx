@@ -187,13 +187,13 @@ export default function GradesPage() {
 
     const { data: subjectsData, isLoading: loadingSubjects } = useQuery<{ subjects: Subject[] }>({
         queryKey: ["subjects-list", filterCourse],
-        queryFn: () => subjectsApi.getAll(1, 100, undefined, filterCourse || undefined),
+        queryFn: () => subjectsApi.getAll(1, 200, undefined, filterCourse || undefined),
         enabled: true,
     });
 
     const { data: studentsData, isLoading: loadingStudents } = useQuery<{ students: Student[] }>({
         queryKey: ["students-for-grade", formCourseId],
-        queryFn: () => studentsApi.getAll(1, 100),
+        queryFn: () => studentsApi.getAll(1, 500),
         enabled: addOpen,
     });
 

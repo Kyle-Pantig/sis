@@ -49,6 +49,7 @@ import {
     IconPlus,
     IconExternalLink,
     IconTrash,
+    IconCopy,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { Check, Search, X } from "lucide-react";
@@ -99,40 +100,40 @@ export default function StudentProfilePage() {
     const { setTitle } = usePageTitle();
     const params = useParams();
     const router = useRouter();
-    const [student, setStudent] = useState<StudentProfile | null>(null);
-    const [loading, setLoading] = useState(true);
     const [isManageModalOpen, setIsManageModalOpen] = useState(false);
     const [manageSearch, setManageSearch] = useState("");
+    const [copied, setCopied] = useState(false);
     const queryClient = useQueryClient();
 
-    const loadStudent = async (silent = false) => {
-        try {
-            if (!silent) setLoading(true);
-            const data = await studentsApi.getById(params.id as string);
-            if (data.error) throw new Error(data.error);
-            setStudent(data);
-            setTitle(`${data.firstName}'s Profile`);
-        } catch (err: any) {
-            console.error("Failed to load student:", err);
-            toast.error(err.message || "Failed to load student details");
-        } finally {
-            if (!silent) setLoading(false);
-        }
-    };
+    const { data: student, isLoading: loading, error } = useQuery<StudentProfile>({
+        queryKey: ["student", params.id],
+        queryFn: () => studentsApi.getById(params.id as string).then(res => {
+            if (res.error) throw new Error(res.error);
+            return res;
+        }),
+        enabled: !!params.id,
+    });
 
     useEffect(() => {
-        if (params.id) {
-            loadStudent();
+        if (student) {
+            setTitle(`${student.firstName}'s Profile`);
         }
-    }, [params.id]);
+    }, [student, setTitle]);
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error.message || "Failed to load student details");
+        }
+    }, [error]);
+
 
     const reserveMutation = useMutation({
         mutationFn: (subjectId: string) =>
             reservationsApi.create({ studentId: params.id as string, subjectId }),
         onSuccess: () => {
-            loadStudent(true); // Silent refresh
+            queryClient.invalidateQueries({ queryKey: ["student", params.id] });
             queryClient.invalidateQueries({ queryKey: ["course-subjects"] });
-            toast.success("Subject enrolled successfully");
+            toast.success("Subject reserved successfully");
         },
         onError: (error: any) => {
             toast.error(error.message || "Failed to reserve subject");
@@ -143,12 +144,38 @@ export default function StudentProfilePage() {
         mutationFn: (reservationId: string) =>
             reservationsApi.delete(reservationId),
         onSuccess: () => {
-            loadStudent(true); // Silent refresh
+            queryClient.invalidateQueries({ queryKey: ["student", params.id] });
             queryClient.invalidateQueries({ queryKey: ["course-subjects"] });
-            toast.success("Subject removed from records");
+            toast.success("Subject unreserved successfully");
         },
         onError: (error: any) => {
             toast.error(error.message || "Failed to remove reservation");
+        },
+    });
+
+    const bulkReserveMutation = useMutation({
+        mutationFn: (subjectIds: string[]) =>
+            reservationsApi.bulkCreate(params.id as string, subjectIds),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["student", params.id] });
+            queryClient.invalidateQueries({ queryKey: ["course-subjects"] });
+            toast.success("All subjects reserved successfully");
+        },
+        onError: (error: any) => {
+            toast.error(error.message || "Failed to reserve subjects");
+        },
+    });
+
+    const bulkUnreserveMutation = useMutation({
+        mutationFn: (ids: string[]) =>
+            reservationsApi.bulkDelete(ids),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["student", params.id] });
+            queryClient.invalidateQueries({ queryKey: ["course-subjects"] });
+            toast.success("All subjects unreserved successfully");
+        },
+        onError: (error: any) => {
+            toast.error(error.message || "Failed to unreserve records");
         },
     });
 
@@ -368,9 +395,26 @@ export default function StudentProfilePage() {
                                     <div className="size-8 rounded-lg bg-zinc-50 flex items-center justify-center border border-zinc-100 group-hover:border-zinc-200 transition-colors">
                                         <IconId className="size-4 text-zinc-400" />
                                     </div>
-                                    <div>
+                                    <div className="flex-1">
                                         <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Student Number</p>
-                                        <p className="text-sm font-semibold text-zinc-800 font-mono">{student.studentNo}</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-sm font-semibold text-zinc-800 font-mono">{student.studentNo}</p>
+                                            <button
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(student.studentNo);
+                                                    setCopied(true);
+                                                    setTimeout(() => setCopied(false), 2000);
+                                                }}
+                                                className="p-1 rounded-md hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors"
+                                                title="Copy Student Number"
+                                            >
+                                                {copied ? (
+                                                    <IconCheck className="size-3.5 text-green-600" />
+                                                ) : (
+                                                    <IconCopy className="size-3.5" />
+                                                )}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3 group">
@@ -624,26 +668,78 @@ export default function StudentProfilePage() {
                             Academic Registration
                         </DialogTitle>
                         <DialogDescription>
-                            Select or remove subjects for <strong>{student?.firstName} {student?.lastName}</strong>.
+                            Select or unreserve subjects for <strong>{student?.firstName} {student?.lastName}</strong>.
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="relative">
-                        <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-zinc-400" />
-                        <Input
-                            placeholder="Search subject code or title..."
-                            value={manageSearch}
-                            onChange={(e) => setManageSearch(e.target.value)}
-                            className="pl-9 h-10 border-zinc-200 focus-visible:ring-blue-500 rounded-lg"
-                        />
-                        {manageSearch && (
-                            <button
-                                onClick={() => setManageSearch("")}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                    <div className="flex flex-col gap-4">
+                        <div className="relative">
+                            <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-zinc-400" />
+                            <Input
+                                placeholder="Search subject code or title..."
+                                value={manageSearch}
+                                onChange={(e) => setManageSearch(e.target.value)}
+                                className="pl-9 h-10 border-zinc-200 focus-visible:ring-blue-500 rounded-lg"
+                            />
+                            {manageSearch && (
+                                <button
+                                    onClick={() => setManageSearch("")}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                                >
+                                    <IconX className="size-4" />
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1 h-9 rounded-lg border-zinc-200 text-xs font-bold gap-2 hover:bg-zinc-50 transition-colors shadow-none"
+                                onClick={() => {
+                                    const subjectsToEnroll = courseSubjects
+                                        ?.filter((sBySearch: any) =>
+                                            sBySearch.code.toLowerCase().includes(manageSearch.toLowerCase()) ||
+                                            sBySearch.title.toLowerCase().includes(manageSearch.toLowerCase())
+                                        )
+                                        .filter((sByEnroll: any) => !student?.subjectReservations.some(r => r.subject.id === sByEnroll.id))
+                                        .map((s: any) => s.id);
+
+                                    if (subjectsToEnroll && subjectsToEnroll.length > 0) {
+                                        bulkReserveMutation.mutate(subjectsToEnroll);
+                                    } else {
+                                        toast.info("No new subjects to reserve in this view");
+                                    }
+                                }}
+                                disabled={bulkReserveMutation.isPending || bulkUnreserveMutation.isPending || loadingSubjects}
                             >
-                                <IconX className="size-4" />
-                            </button>
-                        )}
+                                <IconPlus className="size-3.5 text-blue-600" />
+                                Reserve All {manageSearch ? "Visible" : ""}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1 h-9 rounded-lg border-zinc-200 text-xs font-bold gap-2 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-colors shadow-none"
+                                onClick={() => {
+                                    const reservationsToRemove = student?.subjectReservations
+                                        .filter(r =>
+                                            r.subject.code.toLowerCase().includes(manageSearch.toLowerCase()) ||
+                                            r.subject.title.toLowerCase().includes(manageSearch.toLowerCase())
+                                        )
+                                        .map(r => r.id);
+
+                                    if (reservationsToRemove && reservationsToRemove.length > 0) {
+                                        bulkUnreserveMutation.mutate(reservationsToRemove);
+                                    } else {
+                                        toast.info("No reserved subjects to unreserve in this view");
+                                    }
+                                }}
+                                disabled={bulkReserveMutation.isPending || bulkUnreserveMutation.isPending || loadingSubjects}
+                            >
+                                <IconTrash className="size-3.5" />
+                                Unreserve All {manageSearch ? "Visible" : ""}
+                            </Button>
+                        </div>
                     </div>
 
                     <ScrollArea className="h-[350px]">
@@ -660,7 +756,10 @@ export default function StudentProfilePage() {
                                 ) || []).map((subject: any) => {
                                     const reservation = student?.subjectReservations.find(r => r.subject.id === subject.id);
                                     const isReserved = !!reservation;
-                                    const isPending = reserveMutation.isPending || unreserveMutation.isPending;
+                                    const isItemUnreserving = unreserveMutation.isPending && unreserveMutation.variables === reservation?.id;
+                                    const isItemReserving = reserveMutation.isPending && reserveMutation.variables === subject.id;
+                                    const isItemProcessing = isItemReserving || isItemUnreserving;
+                                    const isAnyBulkProcessing = bulkReserveMutation.isPending || bulkUnreserveMutation.isPending;
 
                                     return (
                                         <div
@@ -683,7 +782,7 @@ export default function StudentProfilePage() {
                                                     <div className="text-sm font-bold text-zinc-900 flex items-center gap-2">
                                                         {subject.code}
                                                         {isReserved && (
-                                                            <Badge variant="secondary" className="bg-zinc-200 text-zinc-700 hover:bg-zinc-200 border-none px-1.5 h-4 text-[9px] uppercase tracking-wider font-black">Enrolled</Badge>
+                                                            <Badge variant="secondary" className="bg-zinc-200 text-zinc-700 hover:bg-zinc-200 border-none px-1.5 h-4 text-[9px] uppercase tracking-wider font-black">Reserved</Badge>
                                                         )}
                                                     </div>
                                                     <div className="text-xs text-zinc-500 font-medium line-clamp-1">{subject.title}</div>
@@ -705,9 +804,9 @@ export default function StudentProfilePage() {
                                                         reserveMutation.mutate(subject.id);
                                                     }
                                                 }}
-                                                disabled={isPending}
+                                                disabled={isItemProcessing || isAnyBulkProcessing}
                                             >
-                                                {isPending && (isReserved ? unreserveMutation.variables === reservation.id : reserveMutation.variables === subject.id) ? (
+                                                {isItemProcessing ? (
                                                     <>
                                                         <IconLoader2 className="size-3.5 animate-spin" />
                                                         Processing...
@@ -715,12 +814,12 @@ export default function StudentProfilePage() {
                                                 ) : isReserved ? (
                                                     <>
                                                         <IconTrash className="size-3.5" />
-                                                        Remove
+                                                        Unreserve
                                                     </>
                                                 ) : (
                                                     <>
                                                         <IconPlus className="size-3.5" />
-                                                        Enroll
+                                                        Reserve
                                                     </>
                                                 )}
                                             </Button>

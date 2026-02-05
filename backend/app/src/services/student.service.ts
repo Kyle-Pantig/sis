@@ -25,32 +25,26 @@ export class StudentService {
         const where: any = {};
 
         if (search) {
-            const searchParts = search.split(/[,\s]+/).map(p => p.trim()).filter(p => p.length > 0);
-
+            const searchParts = search.trim().split(/\s+/);
             if (searchParts.length > 1) {
-                // If multiple words, try to match across first/last names
-                where.OR = [
-                    // Original single field matches
-                    { studentNo: { contains: search, mode: "insensitive" } },
-                    { firstName: { contains: search, mode: "insensitive" } },
-                    { lastName: { contains: search, mode: "insensitive" } },
-                    { email: { contains: search, mode: "insensitive" } },
-                    // Multi-part name matches
-                    {
-                        AND: searchParts.map(part => ({
-                            OR: [
-                                { firstName: { contains: part, mode: "insensitive" } },
-                                { lastName: { contains: part, mode: "insensitive" } },
-                            ]
-                        }))
-                    }
-                ];
+                where.AND = searchParts.map(part => ({
+                    OR: [
+                        { studentNo: { contains: part, mode: "insensitive" } },
+                        { firstName: { contains: part, mode: "insensitive" } },
+                        { lastName: { contains: part, mode: "insensitive" } },
+                        { email: { contains: part, mode: "insensitive" } },
+                        { course: { name: { contains: part, mode: "insensitive" } } },
+                        { course: { code: { contains: part, mode: "insensitive" } } },
+                    ]
+                }));
             } else {
                 where.OR = [
                     { studentNo: { contains: search, mode: "insensitive" } },
                     { firstName: { contains: search, mode: "insensitive" } },
                     { lastName: { contains: search, mode: "insensitive" } },
                     { email: { contains: search, mode: "insensitive" } },
+                    { course: { name: { contains: search, mode: "insensitive" } } },
+                    { course: { code: { contains: search, mode: "insensitive" } } },
                 ];
             }
         }

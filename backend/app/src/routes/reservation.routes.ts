@@ -24,4 +24,17 @@ export const reservationRoutes = new Elysia({ prefix: "/reservations" })
     })
     .delete("/:id", (context: any) => ReservationController.deleteReservation(context), {
         requireRoles: ["admin", "encoder"]
+    })
+    .post("/bulk", (context: any) => ReservationController.bulkCreateReservations(context), {
+        body: t.Object({
+            studentId: t.String(),
+            subjectIds: t.Array(t.String()),
+        }),
+        requireRoles: ["admin", "encoder"]
+    })
+    .delete("/bulk", (context: any) => ReservationController.bulkDeleteReservations(context), {
+        body: t.Object({
+            ids: t.Array(t.String()),
+        }),
+        requireRoles: ["admin", "encoder"]
     });

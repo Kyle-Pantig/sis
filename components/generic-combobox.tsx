@@ -53,8 +53,10 @@ export function GenericCombobox({
             itemToStringLabel={(option) => (option ? option.label : "")}
             filter={(item, query) => {
                 const searchStr = item.label.toLowerCase();
-                const searchInput = query.toLowerCase();
-                return searchStr.includes(searchInput);
+                const searchInput = query.toLowerCase().trim();
+                const searchParts = searchInput.split(/\s+/);
+
+                return searchParts.every(part => searchStr.includes(part));
             }}
             autoHighlight={true}
         >

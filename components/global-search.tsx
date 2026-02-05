@@ -16,19 +16,66 @@ import {
 } from "@tabler/icons-react"
 import { Command as CommandPrimitive } from "cmdk"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { studentsApi } from "@/lib/api"
+import { studentsApi, coursesApi } from "@/lib/api"
 import { useAuth } from "@/context/auth-context"
 import { cn } from "@/lib/utils"
+import { useQuery } from "@tanstack/react-query"
 import { SearchIcon } from "lucide-react"
+
+interface SearchStudent {
+    id: string;
+    studentNo: string;
+    firstName: string;
+    lastName: string;
+    course?: {
+        code: string;
+    };
+}
+
+interface SearchCourse {
+    id: string;
+    code: string;
+    name: string;
+}
 
 export function GlobalSearch() {
     const [open, setOpen] = React.useState(false)
     const [query, setQuery] = React.useState("")
-    const [students, setStudents] = React.useState<any[]>([])
-    const [isLoading, setIsLoading] = React.useState(false)
+    const [debouncedQuery, setDebouncedQuery] = React.useState("")
     const router = useRouter()
     const { user } = useAuth()
     const inputRef = React.useRef<HTMLInputElement>(null)
+
+    // Handle debouncing
+    React.useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedQuery(query)
+        }, 300)
+        return () => clearTimeout(timer)
+    }, [query])
+
+    const { data: searchResults, isLoading: isSearching } = useQuery({
+        queryKey: ["global-search", debouncedQuery],
+        queryFn: async () => {
+            if (!debouncedQuery.trim()) return { students: [] as SearchStudent[], courses: [] as SearchCourse[] }
+            const [studentsData, coursesData] = await Promise.all([
+                studentsApi.getAll(1, 10, debouncedQuery),
+                coursesApi.getAll(1, 10, debouncedQuery)
+            ])
+            return {
+                students: (studentsData.students || []) as SearchStudent[],
+                courses: (coursesData.courses || []) as SearchCourse[]
+            }
+        },
+        enabled: open && debouncedQuery.trim().length > 0,
+        staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    })
+
+    const students = searchResults?.students || []
+    const courses = searchResults?.courses || []
+
+    // Show loading state if we are actually fetching OR if we are waiting for the debounce
+    const isLoading = (query.trim().length > 0 && query !== debouncedQuery) || isSearching
 
     React.useEffect(() => {
         const down = (e: KeyboardEvent) => {
@@ -52,33 +99,12 @@ export function GlobalSearch() {
     React.useEffect(() => {
         if (open) {
             setQuery("")
-            setStudents([])
+            setDebouncedQuery("")
             setTimeout(() => {
                 inputRef.current?.focus()
             }, 0)
         }
     }, [open])
-
-    React.useEffect(() => {
-        if (!query.trim()) {
-            setStudents([])
-            return
-        }
-
-        const timer = setTimeout(async () => {
-            setIsLoading(true)
-            try {
-                const data = await studentsApi.getAll(1, 10, query)
-                setStudents(data.students || [])
-            } catch (error) {
-                console.error("Search error:", error)
-            } finally {
-                setIsLoading(false)
-            }
-        }, 300)
-
-        return () => clearTimeout(timer)
-    }, [query])
 
     const runCommand = React.useCallback((command: () => void) => {
         setOpen(false)
@@ -109,9 +135,12 @@ export function GlobalSearch() {
                             placeholder="Search students, pages, or settings..."
                             className="flex h-12 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-zinc-400 disabled:cursor-not-allowed disabled:opacity-50"
                         />
-                        <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-zinc-200 bg-zinc-100 px-1.5 font-mono text-[10px] font-medium text-zinc-500">
-                            ESC
-                        </kbd>
+                        <div className="flex items-center gap-2">
+                            {isLoading && <IconLoader2 className="size-4 animate-spin text-blue-600" />}
+                            <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-zinc-200 bg-zinc-100 px-1.5 font-mono text-[10px] font-medium text-zinc-500">
+                                ESC
+                            </kbd>
+                        </div>
                     </div>
 
                     {/* Results List */}
@@ -125,9 +154,34 @@ export function GlobalSearch() {
                             ) : query ? (
                                 "No results found."
                             ) : (
-                                "Type to search students or select a page below."
+                                "Type to search students, courses or select a page below."
                             )}
                         </CommandPrimitive.Empty>
+
+                        {/* Course Results */}
+                        {courses.length > 0 && (
+                            <CommandPrimitive.Group heading="Courses" className="px-1 py-2">
+                                <p className="px-2 pb-2 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                                    Courses
+                                </p>
+                                {courses.map((course: SearchCourse) => (
+                                    <CommandPrimitive.Item
+                                        key={course.id}
+                                        value={`course-${course.id}`}
+                                        onSelect={() => runCommand(() => router.push(`/dashboard/students?courseId=${course.id}`))}
+                                        className="relative flex cursor-pointer select-none items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors data-[selected=true]:bg-zinc-100 hover:bg-zinc-50"
+                                    >
+                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+                                            <IconFolder className="size-4" />
+                                        </div>
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="font-medium text-zinc-900">{course.name}</span>
+                                            <span className="text-xs text-zinc-500 font-mono italic">{course.code} • View Enrolled Students</span>
+                                        </div>
+                                    </CommandPrimitive.Item>
+                                ))}
+                            </CommandPrimitive.Group>
+                        )}
 
                         {/* Student Results */}
                         {students.length > 0 && (
@@ -135,7 +189,7 @@ export function GlobalSearch() {
                                 <p className="px-2 pb-2 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
                                     Students
                                 </p>
-                                {students.map((student) => (
+                                {students.map((student: SearchStudent) => (
                                     <CommandPrimitive.Item
                                         key={student.id}
                                         value={`student-${student.id}`}
@@ -147,7 +201,15 @@ export function GlobalSearch() {
                                         </div>
                                         <div className="flex flex-col gap-0.5">
                                             <span className="font-medium text-zinc-900">{student.lastName}, {student.firstName}</span>
-                                            <span className="text-xs text-zinc-500 font-mono">{student.studentNo}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs text-zinc-500 font-mono">{student.studentNo}</span>
+                                                {student.course && (
+                                                    <>
+                                                        <span className="text-zinc-300">•</span>
+                                                        <span className="text-[10px] font-bold text-blue-600 px-1.5 py-0.5 bg-blue-50 rounded uppercase">{student.course.code}</span>
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
                                     </CommandPrimitive.Item>
                                 ))}

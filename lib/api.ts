@@ -104,6 +104,14 @@ export const reservationsApi = {
     delete: (id: string) => fetchApi(`/api/reservations/${id}`, {
         method: "DELETE",
     }),
+    bulkCreate: (studentId: string, subjectIds: string[]) => fetchApi("/api/reservations/bulk", {
+        method: "POST",
+        body: JSON.stringify({ studentId, subjectIds }),
+    }),
+    bulkDelete: (ids: string[]) => fetchApi("/api/reservations/bulk", {
+        method: "DELETE",
+        body: JSON.stringify({ ids }),
+    }),
 };
 
 export const subjectsApi = {

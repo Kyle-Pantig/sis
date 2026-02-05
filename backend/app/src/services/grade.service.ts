@@ -47,11 +47,27 @@ export class GradeService {
         }
 
         if (search) {
-            where.OR = [
-                { student: { firstName: { contains: search, mode: "insensitive" } } },
-                { student: { lastName: { contains: search, mode: "insensitive" } } },
-                { student: { studentNo: { contains: search, mode: "insensitive" } } },
-            ];
+            const searchParts = search.trim().split(/\s+/);
+            if (searchParts.length > 1) {
+                // If multiple words, try matching first name and last name combinations
+                where.AND = searchParts.map(part => ({
+                    OR: [
+                        { student: { firstName: { contains: part, mode: "insensitive" } } },
+                        { student: { lastName: { contains: part, mode: "insensitive" } } },
+                        { student: { studentNo: { contains: part, mode: "insensitive" } } },
+                        { course: { name: { contains: part, mode: "insensitive" } } },
+                        { course: { code: { contains: part, mode: "insensitive" } } },
+                    ]
+                }));
+            } else {
+                where.OR = [
+                    { student: { firstName: { contains: search, mode: "insensitive" } } },
+                    { student: { lastName: { contains: search, mode: "insensitive" } } },
+                    { student: { studentNo: { contains: search, mode: "insensitive" } } },
+                    { course: { name: { contains: search, mode: "insensitive" } } },
+                    { course: { code: { contains: search, mode: "insensitive" } } },
+                ];
+            }
         }
 
         const [grades, total] = await Promise.all([

@@ -60,4 +60,27 @@ export class ReservationController {
             return { error: "Failed to delete reservation" };
         }
     }
+
+    static async bulkCreateReservations({ body, set }: { body: { studentId: string; subjectIds: string[] }; set: any }) {
+        try {
+            const results = await SubjectReservationService.bulkCreateReservations(body.studentId, body.subjectIds);
+            set.status = 201;
+            return results;
+        } catch (error: any) {
+            console.error(error);
+            set.status = 400;
+            return { error: error.message || "Failed to create reservations" };
+        }
+    }
+
+    static async bulkDeleteReservations({ body, set }: { body: { ids: string[] }; set: any }) {
+        try {
+            await SubjectReservationService.bulkDeleteReservations(body.ids);
+            return { success: true };
+        } catch (error: any) {
+            console.error(error);
+            set.status = 500;
+            return { error: "Failed to delete reservations" };
+        }
+    }
 }

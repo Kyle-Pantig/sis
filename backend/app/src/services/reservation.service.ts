@@ -126,6 +126,72 @@ export class SubjectReservationService {
         return reservation;
     }
 
+    static async bulkCreateReservations(studentId: string, subjectIds: string[]) {
+        const student = await prisma.student.findUnique({
+            where: { id: studentId },
+            select: { id: true, courseId: true },
+        });
+
+        if (!student) throw new Error("Student not found");
+
+        const admin = await prisma.user.findFirst();
+
+        return await prisma.$transaction(async (tx) => {
+            const results = [];
+            for (const subjectId of subjectIds) {
+                // Check if subject belongs to course
+                const subject = await tx.subject.findUnique({
+                    where: { id: subjectId },
+                });
+
+                if (!subject || subject.courseId !== student.courseId) continue;
+
+                // Check duplicate
+                const existing = await tx.subjectReservation.findUnique({
+                    where: {
+                        studentId_subjectId: {
+                            studentId,
+                            subjectId,
+                        },
+                    },
+                });
+
+                if (existing) continue;
+
+                const reservation = await tx.subjectReservation.create({
+                    data: {
+                        studentId,
+                        subjectId,
+                        status: "reserved",
+                    },
+                });
+
+                // Grade record
+                if (admin) {
+                    await tx.grade.upsert({
+                        where: {
+                            studentId_subjectId_courseId: {
+                                studentId,
+                                subjectId,
+                                courseId: student.courseId,
+                            }
+                        },
+                        update: {},
+                        create: {
+                            studentId,
+                            subjectId,
+                            courseId: student.courseId,
+                            encodedByUserId: admin.id,
+                            remarks: "Pending"
+                        }
+                    });
+                }
+                results.push(reservation);
+            }
+            return results;
+        });
+    }
+
     static async cancelReservation(id: string) {
         return await prisma.subjectReservation.update({
             where: { id },
@@ -159,6 +225,36 @@ export class SubjectReservationService {
 
         return await prisma.subjectReservation.delete({
             where: { id },
+        });
+    }
+
+    static async bulkDeleteReservations(ids: string[]) {
+        return await prisma.$transaction(async (tx) => {
+            for (const id of ids) {
+                const reservation = await tx.subjectReservation.findUnique({
+                    where: { id },
+                    include: { student: true }
+                });
+
+                if (reservation) {
+                    try {
+                        await tx.grade.delete({
+                            where: {
+                                studentId_subjectId_courseId: {
+                                    studentId: reservation.studentId,
+                                    subjectId: reservation.subjectId,
+                                    courseId: reservation.student.courseId,
+                                }
+                            }
+                        });
+                    } catch (e) { }
+                }
+
+                await tx.subjectReservation.delete({
+                    where: { id }
+                });
+            }
+            return { success: true };
         });
     }
 }
