@@ -862,6 +862,7 @@ export default function GradesPage() {
                     <div className="flex w-full lg:w-auto lg:flex-1 lg:justify-end gap-3">
                         <Skeleton className="h-10 w-full sm:w-[200px]" />
                         <Skeleton className="h-10 w-full sm:w-[200px]" />
+                        <Skeleton className="h-10 w-full sm:w-[200px]" />
                     </div>
                 </div>
 
