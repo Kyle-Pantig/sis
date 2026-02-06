@@ -273,136 +273,118 @@ export default function CoursesPage() {
     }
 
     const columns = React.useMemo<ColumnDef<Course>[]>(
-        () => {
-            const cols: ColumnDef<Course>[] = [
-                {
-                    id: "select",
-                    header: ({ table }) => (
-                        user?.role === "admin" ? (
-                            <Checkbox
-                                checked={areAllSelected ? true : isAnySelected ? "indeterminate" : false}
-                                onCheckedChange={() => toggleAllRowSelection()}
-                                aria-label="Select all"
-                            />
-                        ) : null
-                    ),
-                    cell: ({ row }) => (
-                        user?.role === "admin" ? (
-                            <Checkbox
-                                checked={selectedIds.includes(row.original.id)}
-                                onCheckedChange={(checked) => {
-                                    if (checked) {
-                                        setSelectedIds((prev) => [...prev, row.original.id]);
-                                    } else {
-                                        setSelectedIds((prev) => prev.filter((id) => id !== row.original.id));
-                                    }
-                                }}
-                                aria-label="Select row"
-                            />
-                        ) : null
-                    ),
-                    enableSorting: false,
-                    enableHiding: false,
-                },
-                {
-                    accessorKey: "code",
-                    header: "Code",
-                    cell: ({ row }) => (
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-bold">
-                            {row.original.code}
-                        </Badge>
-                    ),
-                },
-                {
-                    accessorKey: "name",
-                    header: "Course Name",
-                    cell: ({ row }) => (
-                        <div>
-                            <p className="font-semibold text-sm text-zinc-900">{row.original.name}</p>
-                            {row.original.description && (
-                                <p className="text-xs text-zinc-500 mt-0.5 line-clamp-1">{row.original.description}</p>
-                            )}
+        () => [
+            ...(user?.role === "admin" ? [{
+                id: "select",
+                header: ({ table }) => (
+                    <Checkbox
+                        checked={areAllSelected ? true : isAnySelected ? "indeterminate" : false}
+                        onCheckedChange={() => toggleAllRowSelection()}
+                        aria-label="Select all"
+                    />
+                ),
+                cell: ({ row }) => (
+                    <Checkbox
+                        checked={selectedIds.includes(row.original.id)}
+                        onCheckedChange={(checked) => {
+                            if (checked) {
+                                setSelectedIds((prev) => [...prev, row.original.id]);
+                            } else {
+                                setSelectedIds((prev) => prev.filter((id) => id !== row.original.id));
+                            }
+                        }}
+                        aria-label="Select row"
+                    />
+                ),
+                enableSorting: false,
+                enableHiding: false,
+            } as ColumnDef<Course>] : []),
+            {
+                accessorKey: "code",
+                header: "Code",
+                cell: ({ row }) => (
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-bold">
+                        {row.original.code}
+                    </Badge>
+                ),
+            },
+            {
+                accessorKey: "name",
+                header: "Course Name",
+                cell: ({ row }) => (
+                    <div>
+                        <p className="font-semibold text-sm text-zinc-900">{row.original.name}</p>
+                        {row.original.description && (
+                            <p className="text-xs text-zinc-500 mt-0.5 line-clamp-1">{row.original.description}</p>
+                        )}
+                    </div>
+                ),
+            },
+            {
+                accessorKey: "_count.students",
+                header: () => (
+                    <div className="text-center">
+                        <IconUsers className="size-4 inline mr-1" />
+                        Students
+                    </div>
+                ),
+                meta: { headerClassName: "justify-center" },
+                cell: ({ row }) => (
+                    <div className="text-center font-bold text-zinc-900">
+                        {row.original._count?.students ?? 0}
+                    </div>
+                ),
+            },
+            {
+                accessorKey: "_count.subjects",
+                header: () => (
+                    <div className="text-center">
+                        <IconBook className="size-4 inline mr-1" />
+                        Subjects
+                    </div>
+                ),
+                meta: { headerClassName: "justify-center" },
+                cell: ({ row }) => (
+                    <div className="text-center font-bold text-zinc-900">
+                        {row.original._count?.subjects ?? 0}
+                    </div>
+                ),
+            },
+            ...(user?.role === "admin" ? [{
+                id: "actions",
+                header: () => <div className="text-right">Actions</div>,
+                meta: { headerClassName: "justify-end" },
+                cell: ({ row }) => {
+                    const course = row.original;
+                    return (
+                        <div className="text-right">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild disabled={selectedIds.length > 0}>
+                                    <Button variant="ghost" size="icon" className="size-8" disabled={selectedIds.length > 0}>
+                                        <IconDotsVertical className="size-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuItem onClick={() => handleEdit(course)} className="cursor-pointer">
+                                        <IconPencil className="size-4 mr-2" />
+                                        Edit Course
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        onClick={() => handleDeleteClick(course)}
+                                        className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
+                                    >
+                                        <IconTrash className="size-4 mr-2" />
+                                        Delete Course
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
-                    ),
+                    );
                 },
-                {
-                    accessorKey: "_count.students",
-                    header: () => (
-                        <div className="text-center">
-                            <IconUsers className="size-4 inline mr-1" />
-                            Students
-                        </div>
-                    ),
-                    meta: { headerClassName: "justify-center" },
-                    cell: ({ row }) => (
-                        <div className="text-center font-bold text-zinc-900">
-                            {row.original._count?.students ?? 0}
-                        </div>
-                    ),
-                },
-                {
-                    accessorKey: "_count.subjects",
-                    header: () => (
-                        <div className="text-center">
-                            <IconBook className="size-4 inline mr-1" />
-                            Subjects
-                        </div>
-                    ),
-                    meta: { headerClassName: "justify-center" },
-                    cell: ({ row }) => (
-                        <div className="text-center font-bold text-zinc-900">
-                            {row.original._count?.subjects ?? 0}
-                        </div>
-                    ),
-                },
-                {
-                    id: "actions",
-                    header: () => <div className="text-right">Actions</div>,
-                    meta: { headerClassName: "justify-end" },
-                    cell: ({ row }) => {
-                        const course = row.original;
-                        return (
-                            <div className="text-right">
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild disabled={selectedIds.length > 0}>
-                                        <Button variant="ghost" size="icon" className="size-8" disabled={selectedIds.length > 0}>
-                                            <IconDotsVertical className="size-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-48">
-                                        {user?.role === "admin" && (
-                                            <DropdownMenuItem onClick={() => handleEdit(course)} className="cursor-pointer">
-                                                <IconPencil className="size-4 mr-2" />
-                                                Edit Course
-                                            </DropdownMenuItem>
-                                        )}
-                                        {user?.role === "admin" && (
-                                            <>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem
-                                                    onClick={() => handleDeleteClick(course)}
-                                                    className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
-                                                >
-                                                    <IconTrash className="size-4 mr-2" />
-                                                    Delete Course
-                                                </DropdownMenuItem>
-                                            </>
-                                        )}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
-                        );
-                    },
-                    enableSorting: false,
-                }
-            ];
-
-            if (user?.role !== "admin") {
-                return cols.filter(col => col.id !== "actions" && col.id !== "select");
-            }
-
-            return cols;
-        },
+                enableSorting: false,
+            } as ColumnDef<Course>] : [])
+        ],
         [user, selectedIds, courses]
     );
 

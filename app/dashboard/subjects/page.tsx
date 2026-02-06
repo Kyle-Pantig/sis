@@ -367,7 +367,7 @@ export default function SubjectsPage() {
             ];
 
             if (user?.role !== "admin") {
-                return cols.filter(col => col.id !== "actions");
+                return cols.filter(col => col.id !== "actions" && col.id !== "select");
             }
 
             return cols;

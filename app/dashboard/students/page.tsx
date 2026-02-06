@@ -309,22 +309,31 @@ export default function StudentsPage() {
 
     const columns = React.useMemo<ColumnDef<Student>[]>(
         () => [
-            {
+            ...(user?.role === "admin" ? [{
                 id: "select",
                 header: ({ table }) => (
                     <Checkbox
                         checked={areAllSelected ? true : isAnySelected ? "indeterminate" : false}
                         onCheckedChange={toggleSelectAll}
+                        aria-label="Select all"
                     />
                 ),
                 cell: ({ row }) => (
                     <Checkbox
                         checked={selectedIds.includes(row.original.id)}
-                        onCheckedChange={() => toggleSelect(row.original.id)}
+                        onCheckedChange={(checked) => {
+                            if (checked) {
+                                setSelectedIds((prev) => [...prev, row.original.id]);
+                            } else {
+                                setSelectedIds((prev) => prev.filter((id) => id !== row.original.id));
+                            }
+                        }}
+                        aria-label="Select row"
                     />
                 ),
                 enableSorting: false,
-            },
+                enableHiding: false,
+            } as ColumnDef<Student>] : []),
             {
                 accessorKey: "studentNo",
                 header: "Student No.",
