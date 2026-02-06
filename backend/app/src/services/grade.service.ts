@@ -369,12 +369,14 @@ export class GradeService {
                 const finalGrade = calculateFinalGrade(prelim, midterm, finals);
 
                 // Auto-calculate remarks
-                let remarks = update.remarks;
+                let remarks: string | null | undefined = update.remarks;
                 if (!remarks) {
                     if (finalGrade !== null) {
                         remarks = finalGrade <= 3.0 ? "Passed" : "Failed";
                     } else if ((prelim && prelim > 0) || (midterm && midterm > 0) || (finals && finals > 0)) {
                         remarks = "INC";
+                    } else {
+                        remarks = null; // Reset to Pending if grades are missing/zero
                     }
                 }
 
