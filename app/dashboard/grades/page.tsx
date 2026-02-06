@@ -229,10 +229,15 @@ export default function GradesPage() {
         const f = editValues.finals ? parseFloat(editValues.finals) : null;
 
         // Auto-calculate remarks for the update
+        // Auto-calculate remarks for the update
         let calculatedRemarks = editValues.remarks;
-        if (p !== null && m !== null && f !== null) {
-            const finalGrade = (p * 0.3) + (m * 0.3) + (f * 0.4);
+        const isMissing = (val: number | null) => val === null || val === 0;
+
+        if (!isMissing(p) && !isMissing(m) && !isMissing(f)) {
+            const finalGrade = (p! * 0.3) + (m! * 0.3) + (f! * 0.4);
             calculatedRemarks = finalGrade <= 3.0 ? "Passed" : "Failed";
+        } else if ((p && p > 0) || (m && m > 0) || (f && f > 0)) {
+            calculatedRemarks = "INC";
         }
 
         await updateMutation.mutateAsync({
@@ -366,6 +371,7 @@ export default function GradesPage() {
         if (grade === null || grade === undefined) return "text-zinc-400";
         const numGrade = typeof grade === 'string' ? parseFloat(grade) : grade;
         if (isNaN(numGrade)) return "text-zinc-400";
+        if (numGrade === 0) return "text-amber-600 font-medium";
         if (numGrade > 3.0) return "text-red-600 font-medium";
         return "text-zinc-900 font-medium";
     }
@@ -527,13 +533,19 @@ export default function GradesPage() {
                         const p = parseFloat(editValues.prelim || "0");
                         const m = parseFloat(editValues.midterm || "0");
                         const f = parseFloat(editValues.finals || "0");
-                        const hasAll = editValues.prelim && editValues.midterm && editValues.finals;
+
+                        const isMissing = (val: string | undefined, num: number) => !val || num === 0;
+                        const hasAll = !isMissing(editValues.prelim, p) && !isMissing(editValues.midterm, m) && !isMissing(editValues.finals, f);
+
                         const final = hasAll ? (p * 0.3) + (m * 0.3) + (f * 0.4) : null;
+                        const hasPartial = !hasAll && (p > 0 || m > 0 || f > 0);
 
                         return (
                             <div className={cn(
                                 "text-center py-1 transition-colors font-medium",
-                                final !== null ? (final <= 3.0 ? "bg-emerald-50/50 text-emerald-700" : "bg-red-50/50 text-red-700") : "text-zinc-400 bg-zinc-50/30"
+                                final !== null
+                                    ? (final <= 3.0 ? "bg-emerald-50/50 text-emerald-700" : "bg-red-50/50 text-red-700")
+                                    : (hasPartial ? "bg-orange-50/50 text-orange-700" : "text-zinc-400 bg-zinc-50/30")
                             )}>
                                 {final !== null ? final.toFixed(2) : "-"}
                             </div>
@@ -542,7 +554,9 @@ export default function GradesPage() {
                     return (
                         <div className={cn(
                             "text-center py-1 font-bold transition-colors",
-                            grade.finalGrade !== null && grade.finalGrade !== undefined ? (grade.finalGrade <= 3.0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700") : "text-zinc-400 bg-zinc-50/30"
+                            grade.finalGrade !== null && grade.finalGrade !== undefined
+                                ? (grade.finalGrade <= 3.0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700")
+                                : (grade.remarks === "INC" ? "bg-orange-50 text-orange-700" : "text-zinc-400 bg-zinc-50/30")
                         )}>
                             {formatGrade(grade.finalGrade)}
                         </div>
@@ -562,13 +576,22 @@ export default function GradesPage() {
                         const p = parseFloat(editValues.prelim || "0");
                         const m = parseFloat(editValues.midterm || "0");
                         const f = parseFloat(editValues.finals || "0");
-                        if (editValues.prelim && editValues.midterm && editValues.finals) {
+
+                        const isMissing = (val: string | undefined, num: number) => !val || num === 0;
+
+                        if (!isMissing(editValues.prelim, p) && !isMissing(editValues.midterm, m) && !isMissing(editValues.finals, f)) {
                             const final = (p * 0.3) + (m * 0.3) + (f * 0.4);
                             status = final <= 3.0 ? "Passed" : "Failed";
                             remarks = status;
                         } else {
-                            status = "Pending";
-                            remarks = null;
+                            const hasPartial = p > 0 || m > 0 || f > 0;
+                            if (hasPartial) {
+                                status = "Pending"; // We reusing Pending style or creating INC?
+                                remarks = "INC";
+                            } else {
+                                status = "Pending";
+                                remarks = null;
+                            }
                         }
                     }
 
@@ -580,7 +603,7 @@ export default function GradesPage() {
                                     "text-[10px] uppercase font-bold px-2 py-0.5 border shadow-none",
                                     status === "Passed" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
                                         status === "Failed" ? "bg-red-50 text-red-700 border-red-200" :
-                                            "text-zinc-400 border-zinc-200 bg-zinc-50"
+                                            (remarks === "INC" ? "bg-orange-50 text-orange-700 border-orange-200" : "text-zinc-400 border-zinc-200 bg-zinc-50")
                                 )}
                             >
                                 {remarks || "Pending"}

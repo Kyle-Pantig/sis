@@ -254,10 +254,16 @@ export default function StudentProfilePage() {
         const f = editValues.finals ? parseFloat(editValues.finals) : null;
 
         // Auto-calculate remarks
+        // Auto-calculate remarks
         let remarks: string | undefined = undefined;
-        if (p !== null && m !== null && f !== null) {
-            const finalGrade = (p * 0.3) + (m * 0.3) + (f * 0.4);
+
+        const isMissing = (val: number | null) => val === null || val === 0;
+
+        if (!isMissing(p) && !isMissing(m) && !isMissing(f)) {
+            const finalGrade = (p! * 0.3) + (m! * 0.3) + (f! * 0.4);
             remarks = finalGrade <= 3.0 ? "Passed" : "Failed";
+        } else if ((p && p > 0) || (m && m > 0) || (f && f > 0)) {
+            remarks = "INC";
         }
 
         await updateGradeMutation.mutateAsync({
@@ -932,31 +938,60 @@ export default function StudentProfilePage() {
                                                 <TableCell className={cn(
                                                     "text-center py-4 text-sm align-middle transition-colors font-bold",
                                                     editingGradeId === grade?.id ? (
-                                                        editValues.prelim && editValues.midterm && editValues.finals ? (
-                                                            ((parseFloat(editValues.prelim) * 0.3) + (parseFloat(editValues.midterm) * 0.3) + (parseFloat(editValues.finals) * 0.4)) <= 3.0
-                                                                ? "bg-emerald-50/50 text-emerald-700"
-                                                                : "bg-red-50/50 text-red-700"
-                                                        ) : "text-zinc-400 bg-zinc-50/30"
+                                                        (() => {
+                                                            const p = parseFloat(editValues.prelim || "0");
+                                                            const m = parseFloat(editValues.midterm || "0");
+                                                            const f = parseFloat(editValues.finals || "0");
+                                                            const isMissing = (val: string | undefined, num: number) => !val || num === 0;
+                                                            const hasAll = !isMissing(editValues.prelim, p) && !isMissing(editValues.midterm, m) && !isMissing(editValues.finals, f);
+                                                            const hasPartial = !hasAll && (p > 0 || m > 0 || f > 0);
+
+                                                            return hasAll
+                                                                ? (((p * 0.3) + (m * 0.3) + (f * 0.4)) <= 3.0 ? "bg-emerald-50/50 text-emerald-700" : "bg-red-50/50 text-red-700")
+                                                                : (hasPartial ? "bg-orange-50/50 text-orange-700" : "text-zinc-400 bg-zinc-50/30");
+                                                        })()
                                                     ) : isBulkEditing && grade && bulkEditValues[grade.id] ? (
-                                                        bulkEditValues[grade.id].prelim && bulkEditValues[grade.id].midterm && bulkEditValues[grade.id].finals ? (
-                                                            ((parseFloat(bulkEditValues[grade.id].prelim) * 0.3) + (parseFloat(bulkEditValues[grade.id].midterm) * 0.3) + (parseFloat(bulkEditValues[grade.id].finals) * 0.4)) <= 3.0
-                                                                ? "bg-emerald-50/50 text-emerald-700"
-                                                                : "bg-red-50/50 text-red-700"
-                                                        ) : "text-zinc-400 bg-zinc-50/30"
+                                                        (() => {
+                                                            const vals = bulkEditValues[grade.id];
+                                                            const p = parseFloat(vals.prelim || "0");
+                                                            const m = parseFloat(vals.midterm || "0");
+                                                            const f = parseFloat(vals.finals || "0");
+                                                            const isMissing = (val: string | undefined, num: number) => !val || num === 0;
+                                                            const hasAll = !isMissing(vals.prelim, p) && !isMissing(vals.midterm, m) && !isMissing(vals.finals, f);
+                                                            const hasPartial = !hasAll && (p > 0 || m > 0 || f > 0);
+
+                                                            return hasAll
+                                                                ? (((p * 0.3) + (m * 0.3) + (f * 0.4)) <= 3.0 ? "bg-emerald-50/50 text-emerald-700" : "bg-red-50/50 text-red-700")
+                                                                : (hasPartial ? "bg-orange-50/50 text-orange-700" : "text-zinc-400 bg-zinc-50/30");
+                                                        })()
                                                     ) : getNumericGrade(grade?.finalGrade) !== null ? (
                                                         getNumericGrade(grade?.finalGrade)! <= 3.0
                                                             ? "bg-emerald-50 text-emerald-700"
                                                             : "bg-red-50 text-red-700"
-                                                    ) : "text-zinc-400 bg-zinc-50/30 font-medium"
+                                                    ) : (grade?.remarks === "INC" ? "bg-orange-50 text-orange-700" : "text-zinc-400 bg-zinc-50/30 font-medium")
                                                 )}>
                                                     {editingGradeId === grade?.id ? (
-                                                        editValues.prelim && editValues.midterm && editValues.finals
-                                                            ? ((parseFloat(editValues.prelim) * 0.3) + (parseFloat(editValues.midterm) * 0.3) + (parseFloat(editValues.finals) * 0.4)).toFixed(2)
-                                                            : "—"
+                                                        (() => {
+                                                            const p = parseFloat(editValues.prelim || "0");
+                                                            const m = parseFloat(editValues.midterm || "0");
+                                                            const f = parseFloat(editValues.finals || "0");
+                                                            const isMissing = (val: string | undefined, num: number) => !val || num === 0;
+                                                            return (!isMissing(editValues.prelim, p) && !isMissing(editValues.midterm, m) && !isMissing(editValues.finals, f))
+                                                                ? ((p * 0.3) + (m * 0.3) + (f * 0.4)).toFixed(2)
+                                                                : "—";
+                                                        })()
                                                     ) : isBulkEditing && grade && bulkEditValues[grade.id] ? (
-                                                        bulkEditValues[grade.id].prelim && bulkEditValues[grade.id].midterm && bulkEditValues[grade.id].finals
-                                                            ? ((parseFloat(bulkEditValues[grade.id].prelim) * 0.3) + (parseFloat(bulkEditValues[grade.id].midterm) * 0.3) + (parseFloat(bulkEditValues[grade.id].finals) * 0.4)).toFixed(2)
-                                                            : "—"
+                                                        (() => {
+                                                            const vals = bulkEditValues[grade.id];
+                                                            const p = parseFloat(vals.prelim || "0");
+                                                            const m = parseFloat(vals.midterm || "0");
+                                                            const f = parseFloat(vals.finals || "0");
+                                                            const isMissing = (val: string | undefined, num: number) => !val || num === 0;
+
+                                                            return (!isMissing(vals.prelim, p) && !isMissing(vals.midterm, m) && !isMissing(vals.finals, f))
+                                                                ? ((p * 0.3) + (m * 0.3) + (f * 0.4)).toFixed(2)
+                                                                : "—"
+                                                        })()
                                                     ) : formatGrade(grade?.finalGrade)}
                                                 </TableCell>
 
@@ -964,16 +999,35 @@ export default function StudentProfilePage() {
                                                 <TableCell className="text-center py-4 align-middle">
                                                     {(() => {
                                                         let remarks = grade?.remarks;
-                                                        if (editingGradeId === grade?.id && editValues.prelim && editValues.midterm && editValues.finals) {
-                                                            const finalGrade = (parseFloat(editValues.prelim) * 0.3) + (parseFloat(editValues.midterm) * 0.3) + (parseFloat(editValues.finals) * 0.4);
-                                                            remarks = finalGrade <= 3.0 ? "Passed" : "Failed";
-                                                        } else if (editingGradeId === grade?.id) {
-                                                            remarks = "Pending";
-                                                        } else if (isBulkEditing && grade && bulkEditValues[grade.id]?.prelim && bulkEditValues[grade.id]?.midterm && bulkEditValues[grade.id]?.finals) {
-                                                            const finalGrade = (parseFloat(bulkEditValues[grade.id].prelim) * 0.3) + (parseFloat(bulkEditValues[grade.id].midterm) * 0.3) + (parseFloat(bulkEditValues[grade.id].finals) * 0.4);
-                                                            remarks = finalGrade <= 3.0 ? "Passed" : "Failed";
+                                                        if (editingGradeId === grade?.id) {
+                                                            const p = parseFloat(editValues.prelim || "0");
+                                                            const m = parseFloat(editValues.midterm || "0");
+                                                            const f = parseFloat(editValues.finals || "0");
+                                                            const isMissing = (val: string | undefined, num: number) => !val || num === 0;
+
+                                                            if (!isMissing(editValues.prelim, p) && !isMissing(editValues.midterm, m) && !isMissing(editValues.finals, f)) {
+                                                                const finalGrade = (p * 0.3) + (m * 0.3) + (f * 0.4);
+                                                                remarks = finalGrade <= 3.0 ? "Passed" : "Failed";
+                                                            } else if (p > 0 || m > 0 || f > 0) {
+                                                                remarks = "INC";
+                                                            } else {
+                                                                remarks = "Pending";
+                                                            }
                                                         } else if (isBulkEditing && grade && bulkEditValues[grade.id]) {
-                                                            remarks = "Pending";
+                                                            const vals = bulkEditValues[grade.id];
+                                                            const p = parseFloat(vals.prelim || "0");
+                                                            const m = parseFloat(vals.midterm || "0");
+                                                            const f = parseFloat(vals.finals || "0");
+                                                            const isMissing = (val: string | undefined, num: number) => !val || num === 0;
+
+                                                            if (!isMissing(vals.prelim, p) && !isMissing(vals.midterm, m) && !isMissing(vals.finals, f)) {
+                                                                const finalGrade = (p * 0.3) + (m * 0.3) + (f * 0.4);
+                                                                remarks = finalGrade <= 3.0 ? "Passed" : "Failed";
+                                                            } else if (p > 0 || m > 0 || f > 0) {
+                                                                remarks = "INC";
+                                                            } else {
+                                                                remarks = "Pending";
+                                                            }
                                                         }
                                                         return (
                                                             <Badge
@@ -984,7 +1038,9 @@ export default function StudentProfilePage() {
                                                                         ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                                                         : remarks === "Failed"
                                                                             ? "bg-red-50 text-red-700 border-red-200"
-                                                                            : "bg-zinc-50 text-zinc-400 border-zinc-200"
+                                                                            : remarks === "INC"
+                                                                                ? "bg-orange-50 text-orange-700 border-orange-200"
+                                                                                : "bg-zinc-50 text-zinc-400 border-zinc-200"
                                                                 )}
                                                             >
                                                                 {remarks || "Pending"}

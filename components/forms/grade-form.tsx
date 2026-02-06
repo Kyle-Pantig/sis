@@ -361,13 +361,21 @@ export function GradeForm({
                                     const p = parseFloat(String(formPrelim || "0"));
                                     const m = parseFloat(String(formMidterm || "0"));
                                     const f = parseFloat(String(formFinals || "0"));
-                                    if (!formPrelim || !formMidterm || !formFinals) {
+                                    const isMissing = (val: any, num: number) => !val || num === 0;
+
+                                    if (isMissing(formPrelim, p) || isMissing(formMidterm, m) || isMissing(formFinals, f)) {
+                                        const hasPartial = p > 0 || m > 0 || f > 0;
                                         return (
                                             <Badge
                                                 variant="outline"
-                                                className="text-[10px] uppercase font-bold px-2 py-0.5 text-zinc-400 border-zinc-200 bg-zinc-50"
+                                                className={cn(
+                                                    "text-[10px] uppercase font-bold px-2 py-0.5 border shadow-none",
+                                                    hasPartial
+                                                        ? "text-orange-600 border-orange-200 bg-orange-50"
+                                                        : "text-zinc-400 border-zinc-200 bg-zinc-50"
+                                                )}
                                             >
-                                                Pending
+                                                {hasPartial ? "INC" : "Pending"}
                                             </Badge>
                                         );
                                     }

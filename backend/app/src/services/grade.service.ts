@@ -21,7 +21,7 @@ export interface UpdateGradeData {
 }
 
 function calculateFinalGrade(prelim?: number | null, midterm?: number | null, finals?: number | null): number | null {
-    if (prelim == null || midterm == null || finals == null) {
+    if (!prelim || !midterm || !finals) {
         return null;
     }
     // Common grading: 30% prelim, 30% midterm, 40% finals
@@ -368,10 +368,14 @@ export class GradeService {
                 const finals = update.finals !== undefined ? update.finals : (existing.finals ? Number(existing.finals) : null);
                 const finalGrade = calculateFinalGrade(prelim, midterm, finals);
 
-                // Auto-calculate remarks if all grades present
+                // Auto-calculate remarks
                 let remarks = update.remarks;
-                if (prelim !== null && midterm !== null && finals !== null && !remarks) {
-                    remarks = finalGrade !== null && finalGrade <= 3.0 ? "Passed" : "Failed";
+                if (!remarks) {
+                    if (finalGrade !== null) {
+                        remarks = finalGrade <= 3.0 ? "Passed" : "Failed";
+                    } else if ((prelim && prelim > 0) || (midterm && midterm > 0) || (finals && finals > 0)) {
+                        remarks = "INC";
+                    }
                 }
 
                 return prisma.grade.update({
