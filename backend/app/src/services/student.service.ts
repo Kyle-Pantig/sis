@@ -31,7 +31,7 @@ export class StudentService {
             // Split on whitespace and commas, remove empty strings and punctuation-only strings
             const searchParts = search.trim()
                 .split(/[\s,]+/)
-                .map(part => part.replace(/[^\w]/g, '')) // Remove non-word characters
+                .map(part => part.replace(/[^\w-]/g, '')) // Remove non-word characters except hyphens
                 .filter(part => part.length > 0);
 
             if (searchParts.length > 1) {
