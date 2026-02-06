@@ -20,7 +20,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { reservationsApi, subjectsApi, studentsApi } from "@/lib/api";
+import { reservationsApi, subjectsApi, studentsApi, gradesApi } from "@/lib/api";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -83,6 +83,14 @@ export default function StudentProfilePage() {
     const [manageSearch, setManageSearch] = useState("");
     const [copied, setCopied] = useState(false);
     const queryClient = useQueryClient();
+
+    // Inline grade editing state
+    const [editingGradeId, setEditingGradeId] = useState<string | null>(null);
+    const [editValues, setEditValues] = useState<{
+        prelim: string;
+        midterm: string;
+        finals: string;
+    }>({ prelim: "", midterm: "", finals: "" });
 
     const { data: student, isLoading: loading, error } = useQuery<StudentProfile>({
         queryKey: ["student", params.id],
@@ -176,6 +184,83 @@ export default function StudentProfilePage() {
             toast.error(error.message || "Failed to update profile");
         },
     });
+
+    // Grade update mutation for inline editing
+    const updateGradeMutation = useMutation({
+        mutationFn: async ({ id, data }: { id: string; data: any }) => {
+            const result = await gradesApi.update(id, data);
+            if (result.error) throw new Error(result.error);
+            return result;
+        },
+        onSuccess: () => {
+            toast.success("Grade updated successfully");
+            queryClient.invalidateQueries({ queryKey: ["student", params.id] });
+            queryClient.invalidateQueries({ queryKey: ["grades"] });
+            setEditingGradeId(null);
+        },
+        onError: (error: any) => {
+            toast.error(error.message || "Failed to update grade");
+        },
+    });
+
+    const isUpdatingGrade = updateGradeMutation.isPending;
+
+    // Inline editing helper functions
+    function startEditGrade(grade: { id: string; prelim?: number | string | null; midterm?: number | string | null; finals?: number | string | null }) {
+        setEditingGradeId(grade.id);
+        setEditValues({
+            prelim: grade.prelim !== null && grade.prelim !== undefined ? String(grade.prelim) : "",
+            midterm: grade.midterm !== null && grade.midterm !== undefined ? String(grade.midterm) : "",
+            finals: grade.finals !== null && grade.finals !== undefined ? String(grade.finals) : "",
+        });
+    }
+
+    function cancelEditGrade() {
+        setEditingGradeId(null);
+        setEditValues({ prelim: "", midterm: "", finals: "" });
+    }
+
+    async function saveEditGrade(gradeId: string) {
+        const p = editValues.prelim ? parseFloat(editValues.prelim) : null;
+        const m = editValues.midterm ? parseFloat(editValues.midterm) : null;
+        const f = editValues.finals ? parseFloat(editValues.finals) : null;
+
+        // Auto-calculate remarks
+        let remarks: string | undefined = undefined;
+        if (p !== null && m !== null && f !== null) {
+            const finalGrade = (p * 0.3) + (m * 0.3) + (f * 0.4);
+            remarks = finalGrade <= 3.0 ? "Passed" : "Failed";
+        }
+
+        await updateGradeMutation.mutateAsync({
+            id: gradeId,
+            data: {
+                prelim: p,
+                midterm: m,
+                finals: f,
+                remarks,
+            },
+        });
+    }
+
+    // Handle keyboard events for inline editing (ESC to cancel, Enter to save)
+    useEffect(() => {
+        if (!editingGradeId) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                e.preventDefault();
+                cancelEditGrade();
+            }
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                saveEditGrade(editingGradeId);
+            }
+        };
+
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [editingGradeId, editValues]);
 
     const { data: courseSubjects, isLoading: loadingSubjects } = useQuery({
         queryKey: ["course-subjects", student?.course.id],
@@ -595,78 +680,145 @@ export default function StudentProfilePage() {
                                                     {subject.units.toFixed(1)}
                                                 </TableCell>
 
-                                                {/* Grade Columns */}
+                                                {/* Prelim Column */}
                                                 <TableCell className="text-center py-4 text-sm font-medium text-zinc-600 align-middle">
-                                                    {grade?.prelim !== null && grade?.prelim !== undefined ? formatGrade(grade.prelim) : <span className="text-zinc-300">—</span>}
-                                                </TableCell>
-                                                <TableCell className="text-center py-4 text-sm font-medium text-zinc-600 align-middle">
-                                                    {grade?.midterm !== null && grade?.midterm !== undefined ? formatGrade(grade.midterm) : <span className="text-zinc-300">—</span>}
-                                                </TableCell>
-                                                <TableCell className="text-center py-4 text-sm font-medium text-zinc-600 align-middle">
-                                                    {grade?.finals !== null && grade?.finals !== undefined ? formatGrade(grade.finals) : <span className="text-zinc-300">—</span>}
+                                                    {editingGradeId === grade?.id ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            max="5"
+                                                            value={editValues.prelim}
+                                                            onChange={(e) => setEditValues({ ...editValues, prelim: e.target.value })}
+                                                            className="w-16 h-8 text-center text-sm mx-auto"
+                                                            autoFocus
+                                                        />
+                                                    ) : (
+                                                        grade?.prelim !== null && grade?.prelim !== undefined ? formatGrade(grade.prelim) : <span className="text-zinc-300">—</span>
+                                                    )}
                                                 </TableCell>
 
-                                                {/* Final Grade Highlight */}
+                                                {/* Midterm Column */}
+                                                <TableCell className="text-center py-4 text-sm font-medium text-zinc-600 align-middle">
+                                                    {editingGradeId === grade?.id ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            max="5"
+                                                            value={editValues.midterm}
+                                                            onChange={(e) => setEditValues({ ...editValues, midterm: e.target.value })}
+                                                            className="w-16 h-8 text-center text-sm mx-auto"
+                                                        />
+                                                    ) : (
+                                                        grade?.midterm !== null && grade?.midterm !== undefined ? formatGrade(grade.midterm) : <span className="text-zinc-300">—</span>
+                                                    )}
+                                                </TableCell>
+
+                                                {/* Finals Column */}
+                                                <TableCell className="text-center py-4 text-sm font-medium text-zinc-600 align-middle">
+                                                    {editingGradeId === grade?.id ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            max="5"
+                                                            value={editValues.finals}
+                                                            onChange={(e) => setEditValues({ ...editValues, finals: e.target.value })}
+                                                            className="w-16 h-8 text-center text-sm mx-auto"
+                                                        />
+                                                    ) : (
+                                                        grade?.finals !== null && grade?.finals !== undefined ? formatGrade(grade.finals) : <span className="text-zinc-300">—</span>
+                                                    )}
+                                                </TableCell>
+
+                                                {/* Final Grade Highlight - Shows calculated value when editing */}
                                                 <TableCell className={cn(
                                                     "text-center py-4 text-sm align-middle transition-colors font-bold",
-                                                    getNumericGrade(grade?.finalGrade) !== null ? (
+                                                    editingGradeId === grade?.id ? (
+                                                        editValues.prelim && editValues.midterm && editValues.finals ? (
+                                                            ((parseFloat(editValues.prelim) * 0.3) + (parseFloat(editValues.midterm) * 0.3) + (parseFloat(editValues.finals) * 0.4)) <= 3.0
+                                                                ? "bg-emerald-50/50 text-emerald-700"
+                                                                : "bg-red-50/50 text-red-700"
+                                                        ) : "text-zinc-400 bg-zinc-50/30"
+                                                    ) : getNumericGrade(grade?.finalGrade) !== null ? (
                                                         getNumericGrade(grade?.finalGrade)! <= 3.0
                                                             ? "bg-emerald-50 text-emerald-700"
                                                             : "bg-red-50 text-red-700"
                                                     ) : "text-zinc-400 bg-zinc-50/30 font-medium"
                                                 )}>
-                                                    {formatGrade(grade?.finalGrade)}
+                                                    {editingGradeId === grade?.id ? (
+                                                        editValues.prelim && editValues.midterm && editValues.finals
+                                                            ? ((parseFloat(editValues.prelim) * 0.3) + (parseFloat(editValues.midterm) * 0.3) + (parseFloat(editValues.finals) * 0.4)).toFixed(2)
+                                                            : "—"
+                                                    ) : formatGrade(grade?.finalGrade)}
                                                 </TableCell>
 
-                                                {/* Remarks Badge */}
+                                                {/* Remarks Badge - Shows calculated when editing */}
                                                 <TableCell className="text-center py-4 align-middle">
-                                                    <Badge
-                                                        variant="secondary"
-                                                        className={cn(
-                                                            "text-[10px] uppercase font-bold px-2 py-0.5 border shadow-none",
-                                                            grade?.remarks === "Passed"
-                                                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                                                : grade?.remarks === "Failed"
-                                                                    ? "bg-red-50 text-red-700 border-red-200"
-                                                                    : "bg-zinc-50 text-zinc-400 border-zinc-200"
-                                                        )}
-                                                    >
-                                                        {grade?.remarks || "Pending"}
-                                                    </Badge>
+                                                    {(() => {
+                                                        let remarks = grade?.remarks;
+                                                        if (editingGradeId === grade?.id && editValues.prelim && editValues.midterm && editValues.finals) {
+                                                            const finalGrade = (parseFloat(editValues.prelim) * 0.3) + (parseFloat(editValues.midterm) * 0.3) + (parseFloat(editValues.finals) * 0.4);
+                                                            remarks = finalGrade <= 3.0 ? "Passed" : "Failed";
+                                                        } else if (editingGradeId === grade?.id) {
+                                                            remarks = "Pending";
+                                                        }
+                                                        return (
+                                                            <Badge
+                                                                variant="secondary"
+                                                                className={cn(
+                                                                    "text-[10px] uppercase font-bold px-2 py-0.5 border shadow-none",
+                                                                    remarks === "Passed"
+                                                                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                                                        : remarks === "Failed"
+                                                                            ? "bg-red-50 text-red-700 border-red-200"
+                                                                            : "bg-zinc-50 text-zinc-400 border-zinc-200"
+                                                                )}
+                                                            >
+                                                                {remarks || "Pending"}
+                                                            </Badge>
+                                                        );
+                                                    })()}
                                                 </TableCell>
 
-                                                {/* Actions Column */}
+                                                {/* Actions Column - Inline Edit */}
                                                 <TableCell className="text-center pr-6 py-4 align-middle">
-                                                    <Button
-                                                        variant={(!grade || grade.remarks === "Pending") ? "default" : "outline"}
-                                                        size="sm"
-                                                        className={cn(
-                                                            "h-8 text-[10px] uppercase font-bold px-3 gap-1.5 shadow-none transition-all",
-                                                            (!grade || grade.remarks === "Pending")
-                                                                ? "bg-blue-600 hover:bg-blue-700 text-white border-transparent"
-                                                                : "border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
-                                                        )}
-                                                        onClick={() => {
-                                                            const params = new URLSearchParams();
-                                                            params.set("search", student.studentNo);
-                                                            params.set("studentId", student.id);
-                                                            params.set("courseId", student.course.id);
-                                                            params.set("subjectId", subject.id);
-
-                                                            // Since we auto-create grade records on reservation,
-                                                            // we can jump straight to inline editing.
-                                                            if (grade) {
-                                                                params.set("editId", grade.id);
-                                                            } else {
-                                                                params.set("add", "true");
-                                                            }
-
-                                                            router.push(`/dashboard/grades?${params.toString()}`);
-                                                        }}
-                                                    >
-                                                        <IconExternalLink className="size-3" />
-                                                        {(!grade || grade.remarks === "Pending") ? "Encode Grade" : "Modify Record"}
-                                                    </Button>
+                                                    {editingGradeId === grade?.id ? (
+                                                        <div className="flex gap-1 justify-center">
+                                                            <Button
+                                                                size="icon"
+                                                                variant="ghost"
+                                                                className="size-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                                                onClick={() => saveEditGrade(grade.id)}
+                                                                disabled={isUpdatingGrade}
+                                                                title="Save (Enter)"
+                                                            >
+                                                                {isUpdatingGrade ? <IconLoader2 className="size-4 animate-spin" /> : <IconCheck className="size-4" />}
+                                                            </Button>
+                                                            <Button
+                                                                size="icon"
+                                                                variant="ghost"
+                                                                className="size-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                                onClick={cancelEditGrade}
+                                                                title="Cancel (Esc)"
+                                                            >
+                                                                <IconX className="size-4" />
+                                                            </Button>
+                                                        </div>
+                                                    ) : grade ? (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-8 text-[10px] uppercase font-bold px-3 gap-1.5 hover:bg-zinc-100"
+                                                            onClick={() => startEditGrade(grade)}
+                                                        >
+                                                            <IconPencil className="size-3" />
+                                                            Edit
+                                                        </Button>
+                                                    ) : (
+                                                        <span className="text-xs text-zinc-400">No grade</span>
+                                                    )}
                                                 </TableCell>
                                             </TableRow>
                                         ))

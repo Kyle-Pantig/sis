@@ -90,11 +90,17 @@ export class StudentService {
             include: {
                 course: true,
                 subjectReservations: {
+                    where: {
+                        isActive: true // Only show active reservations (current course)
+                    },
                     include: {
                         subject: true,
                     },
                 },
                 grades: {
+                    where: {
+                        isActive: true // Only show active grades (current course)
+                    },
                     include: {
                         subject: true,
                     },
@@ -178,19 +184,81 @@ export class StudentService {
             throw new Error("Student not found");
         }
 
-        const result = await prisma.student.update({
-            where: { id },
-            data: {
-                ...(data.studentNo && { studentNo: data.studentNo }),
-                ...(data.firstName && { firstName: data.firstName }),
-                ...(data.lastName && { lastName: data.lastName }),
-                ...(data.email !== undefined && { email: data.email || null }),
-                ...(data.birthDate && { birthDate: new Date(data.birthDate) }),
-                ...(data.courseId && { courseId: data.courseId }),
-            },
-            include: {
-                course: true,
-            },
+        // Check if course is changing
+        const isCourseChanging = data.courseId && data.courseId !== existing.courseId;
+
+        // Use transaction if course is changing to ensure atomicity
+        const result = await prisma.$transaction(async (tx) => {
+            // If course is changing, handle academic records
+            if (isCourseChanging) {
+                // 1. Mark all CURRENT course reservations as inactive (held)
+                await tx.subjectReservation.updateMany({
+                    where: {
+                        studentId: id,
+                        isActive: true,
+                        subject: {
+                            courseId: existing.courseId! // Only current course subjects
+                        }
+                    },
+                    data: {
+                        isActive: false
+                    }
+                });
+
+                // 2. Mark all CURRENT course grades as inactive (held)
+                await tx.grade.updateMany({
+                    where: {
+                        studentId: id,
+                        courseId: existing.courseId!, // Only current course grades
+                        isActive: true
+                    },
+                    data: {
+                        isActive: false
+                    }
+                });
+
+                // 3. Reactivate any EXISTING reservations for the NEW course (if student is switching back)
+                await tx.subjectReservation.updateMany({
+                    where: {
+                        studentId: id,
+                        isActive: false,
+                        subject: {
+                            courseId: data.courseId! // New course subjects
+                        }
+                    },
+                    data: {
+                        isActive: true
+                    }
+                });
+
+                // 4. Reactivate any EXISTING grades for the NEW course (if student is switching back)
+                await tx.grade.updateMany({
+                    where: {
+                        studentId: id,
+                        courseId: data.courseId!, // New course grades
+                        isActive: false
+                    },
+                    data: {
+                        isActive: true
+                    }
+                });
+            }
+
+            // Update the student
+            return await tx.student.update({
+                where: { id },
+                data: {
+                    ...(data.studentNo && { studentNo: data.studentNo }),
+                    ...(data.firstName && { firstName: data.firstName }),
+                    ...(data.lastName && { lastName: data.lastName }),
+                    ...(data.email !== undefined && { email: data.email || null }),
+                    ...(data.birthDate && { birthDate: new Date(data.birthDate) }),
+                    ...(data.courseId && { courseId: data.courseId }),
+                },
+                include: {
+                    course: true,
+                },
+            });
         });
 
         if (userId) {
@@ -199,7 +267,10 @@ export class StudentService {
             if (data.firstName && data.firstName !== existing.firstName) changes.firstName = { from: existing.firstName, to: data.firstName };
             if (data.lastName && data.lastName !== existing.lastName) changes.lastName = { from: existing.lastName, to: data.lastName };
             if (data.email !== undefined && data.email !== existing.email) changes.email = { from: existing.email, to: data.email };
-            if (data.courseId && data.courseId !== existing.courseId) changes.course = { from: existing.course?.code, to: result.course?.code };
+            if (isCourseChanging) {
+                changes.course = { from: existing.course?.code, to: result.course?.code };
+                changes.academicRecordsSwitched = true; // Old course records held, new course records reactivated
+            }
 
             if (Object.keys(changes).length > 0) {
                 await AuditService.log(userId, "UPDATE_STUDENT", "Student", id, changes);

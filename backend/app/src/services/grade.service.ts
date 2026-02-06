@@ -113,7 +113,10 @@ export class GradeService {
 
     static async getGradesByStudent(studentId: string) {
         return await prisma.grade.findMany({
-            where: { studentId },
+            where: {
+                studentId,
+                isActive: true // Only show active grades (current course)
+            },
             include: {
                 subject: true,
                 course: true,
