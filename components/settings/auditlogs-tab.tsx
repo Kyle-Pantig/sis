@@ -643,7 +643,7 @@ function AuditDetailsButton({ log }: { log: any }) {
                     <IconInfoCircle className="size-5" />
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md!">
                 <DialogHeader>
                     <DialogTitle>Log Details</DialogTitle>
                     <DialogDescription>
@@ -736,14 +736,26 @@ function LogDetailsRenderer({ details }: { details: any }) {
                                     if (typeof item === 'object' && item !== null) {
                                         return (
                                             <div key={i} className="text-xs bg-zinc-50 border border-zinc-200 p-2 rounded grid grid-cols-2 gap-x-4 gap-y-1">
-                                                {Object.entries(item).map(([k, v]) => (
-                                                    <div key={k} className="flex justify-between gap-2 overflow-hidden items-center">
-                                                        <span className="text-zinc-500 capitalize truncate shrink-0 max-w-[50%]">{k}:</span>
-                                                        <span className="font-medium text-zinc-900 truncate" title={v === null ? '-' : String(v)}>
-                                                            {v === null ? '-' : String(v)}
-                                                        </span>
-                                                    </div>
-                                                ))}
+                                                {Object.entries(item).map(([k, v]) => {
+                                                    const strVal = v === null ? '-' : String(v);
+                                                    const isChange = strVal.includes("→");
+                                                    return (
+                                                        <div key={k} className="flex justify-between gap-2 overflow-hidden items-center">
+                                                            <span className="text-zinc-500 capitalize truncate shrink-0 max-w-[40%]">{k}:</span>
+                                                            <div className="font-medium text-zinc-900 truncate flex items-center justify-end w-full" title={strVal}>
+                                                                {isChange ? (
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-zinc-400 line-through decoration-zinc-300 font-normal">{strVal.split('→')[0].trim()}</span>
+                                                                        <span className="text-zinc-300 text-[10px]">→</span>
+                                                                        <span className="text-zinc-900 font-semibold">{strVal.split('→')[1].trim()}</span>
+                                                                    </div>
+                                                                ) : (
+                                                                    strVal
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         )
                                     }
