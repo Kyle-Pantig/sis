@@ -70,6 +70,29 @@ export const gradeRoutes = new Elysia({ prefix: "/grades" })
         }),
         requireRoles: ["admin", "encoder"]
     })
+    .patch("/bulk", async (context: any) => {
+        // Manually extract user since derive doesn't propagate
+        let user = context.user;
+        if (!user && context.cookie?.session?.value) {
+            try {
+                user = await context.jwt.verify(context.cookie.session.value);
+            } catch (e) {
+                // Ignore verify error
+            }
+        }
+        return GradeController.bulkUpdateGrades({ ...context, user });
+    }, {
+        body: t.Object({
+            updates: t.Array(t.Object({
+                id: t.String(),
+                prelim: t.Optional(t.Nullable(t.Number())),
+                midterm: t.Optional(t.Nullable(t.Number())),
+                finals: t.Optional(t.Nullable(t.Number())),
+                remarks: t.Optional(t.String()),
+            })),
+        }),
+        requireRoles: ["admin", "encoder"]
+    })
     .delete("/:id", async (context: any) => {
         // Manually extract user since derive doesn't propagate
         let user = context.user;
@@ -84,3 +107,4 @@ export const gradeRoutes = new Elysia({ prefix: "/grades" })
     }, {
         requireRoles: ["admin", "encoder"]
     });
+

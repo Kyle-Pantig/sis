@@ -101,4 +101,15 @@ export class GradeController {
             return { error: "Failed to delete grade" };
         }
     }
+
+    static async bulkUpdateGrades({ body, set, user }: { body: { updates: Array<{ id: string; prelim?: number | null; midterm?: number | null; finals?: number | null; remarks?: string }> }; set: any; user: any }) {
+        try {
+            const result = await GradeService.bulkUpdateGrades(body.updates, user?.id);
+            return result;
+        } catch (error: any) {
+            console.error(error);
+            set.status = 500;
+            return { error: "Failed to update grades" };
+        }
+    }
 }

@@ -84,13 +84,21 @@ export default function StudentProfilePage() {
     const [copied, setCopied] = useState(false);
     const queryClient = useQueryClient();
 
-    // Inline grade editing state
+    // Single inline grade editing state
     const [editingGradeId, setEditingGradeId] = useState<string | null>(null);
     const [editValues, setEditValues] = useState<{
         prelim: string;
         midterm: string;
         finals: string;
     }>({ prelim: "", midterm: "", finals: "" });
+
+    // Bulk inline grade editing state
+    const [isBulkEditing, setIsBulkEditing] = useState(false);
+    const [bulkEditValues, setBulkEditValues] = useState<Record<string, {
+        prelim: string;
+        midterm: string;
+        finals: string;
+    }>>({});
 
     const { data: student, isLoading: loading, error } = useQuery<StudentProfile>({
         queryKey: ["student", params.id],
@@ -185,7 +193,7 @@ export default function StudentProfilePage() {
         },
     });
 
-    // Grade update mutation for inline editing
+    // Single grade update mutation for inline editing
     const updateGradeMutation = useMutation({
         mutationFn: async ({ id, data }: { id: string; data: any }) => {
             const result = await gradesApi.update(id, data);
@@ -205,7 +213,7 @@ export default function StudentProfilePage() {
 
     const isUpdatingGrade = updateGradeMutation.isPending;
 
-    // Inline editing helper functions
+    // Single-row inline editing helper functions
     function startEditGrade(grade: { id: string; prelim?: number | string | null; midterm?: number | string | null; finals?: number | string | null }) {
         setEditingGradeId(grade.id);
         setEditValues({
@@ -234,16 +242,11 @@ export default function StudentProfilePage() {
 
         await updateGradeMutation.mutateAsync({
             id: gradeId,
-            data: {
-                prelim: p,
-                midterm: m,
-                finals: f,
-                remarks,
-            },
+            data: { prelim: p, midterm: m, finals: f, remarks },
         });
     }
 
-    // Handle keyboard events for inline editing (ESC to cancel, Enter to save)
+    // Handle keyboard events for single-row editing (ESC to cancel, Enter to save)
     useEffect(() => {
         if (!editingGradeId) return;
 
@@ -261,6 +264,89 @@ export default function StudentProfilePage() {
         document.addEventListener("keydown", handleKeyDown);
         return () => document.removeEventListener("keydown", handleKeyDown);
     }, [editingGradeId, editValues]);
+
+    // Bulk grade update mutation
+    const bulkUpdateGradeMutation = useMutation({
+        mutationFn: async (updates: Array<{ id: string; prelim?: number | null; midterm?: number | null; finals?: number | null }>) => {
+            const result = await gradesApi.bulkUpdate(updates);
+            if (result.error) throw new Error(result.error);
+            return result;
+        },
+        onSuccess: (result) => {
+            toast.success(`${result.count} grade(s) updated successfully`);
+            queryClient.invalidateQueries({ queryKey: ["student", params.id] });
+            queryClient.invalidateQueries({ queryKey: ["grades"] });
+            setIsBulkEditing(false);
+            setBulkEditValues({});
+        },
+        onError: (error: any) => {
+            toast.error(error.message || "Failed to update grades");
+        },
+    });
+
+    const isUpdatingGrades = bulkUpdateGradeMutation.isPending;
+
+    // Bulk editing helper functions
+    function startBulkEdit(grades: Array<{ id: string; prelim?: number | string | null; midterm?: number | string | null; finals?: number | string | null }>) {
+        const initialValues: Record<string, { prelim: string; midterm: string; finals: string }> = {};
+        grades.forEach(grade => {
+            initialValues[grade.id] = {
+                prelim: grade.prelim !== null && grade.prelim !== undefined ? String(grade.prelim) : "",
+                midterm: grade.midterm !== null && grade.midterm !== undefined ? String(grade.midterm) : "",
+                finals: grade.finals !== null && grade.finals !== undefined ? String(grade.finals) : "",
+            };
+        });
+        setBulkEditValues(initialValues);
+        setIsBulkEditing(true);
+    }
+
+    function cancelBulkEdit() {
+        setIsBulkEditing(false);
+        setBulkEditValues({});
+    }
+
+    function updateGradeValue(gradeId: string, field: 'prelim' | 'midterm' | 'finals', value: string) {
+        setBulkEditValues(prev => ({
+            ...prev,
+            [gradeId]: {
+                ...prev[gradeId],
+                [field]: value,
+            }
+        }));
+    }
+
+    async function saveBulkGrades() {
+        const updates = Object.entries(bulkEditValues).map(([id, values]) => ({
+            id,
+            prelim: values.prelim ? parseFloat(values.prelim) : null,
+            midterm: values.midterm ? parseFloat(values.midterm) : null,
+            finals: values.finals ? parseFloat(values.finals) : null,
+        }));
+
+        // Only send grades that have changes
+        if (updates.length > 0) {
+            await bulkUpdateGradeMutation.mutateAsync(updates);
+        }
+    }
+
+    // Handle keyboard events for bulk editing (ESC to cancel, Ctrl+S to save all)
+    useEffect(() => {
+        if (!isBulkEditing) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                e.preventDefault();
+                cancelBulkEdit();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+                e.preventDefault();
+                saveBulkGrades();
+            }
+        };
+
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [isBulkEditing, bulkEditValues]);
 
     const { data: courseSubjects, isLoading: loadingSubjects } = useQuery({
         queryKey: ["course-subjects", student?.course.id],
@@ -617,19 +703,60 @@ export default function StudentProfilePage() {
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div className="space-y-1">
                                     <CardTitle className="text-lg font-bold text-zinc-900">Academic Records</CardTitle>
-                                    <p className="text-sm text-zinc-500">Official grades for enrolled subjects.</p>
+                                    <p className="text-sm text-zinc-500">
+                                        {isBulkEditing
+                                            ? "Edit grades below. Press Ctrl+S to save all or ESC to cancel."
+                                            : "Official grades for enrolled subjects."
+                                        }
+                                    </p>
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="h-9 gap-2 font-semibold shadow-none border-zinc-200"
-                                        onClick={() => setIsManageModalOpen(true)}
-                                    >
-                                        <IconSettings className="size-4" />
-                                        Manage Enrollment
-                                    </Button>
-                                    {/* Future: Add Export/Print buttons here */}
+                                    {isBulkEditing ? (
+                                        <>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-9 gap-2 font-semibold shadow-none border-zinc-200"
+                                                onClick={cancelBulkEdit}
+                                                disabled={isUpdatingGrades}
+                                            >
+                                                <IconX className="size-4" />
+                                                Cancel
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                className="h-9 gap-2 font-semibold shadow-none bg-primary hover:bg-primary/80"
+                                                onClick={saveBulkGrades}
+                                                disabled={isUpdatingGrades}
+                                            >
+                                                {isUpdatingGrades ? <IconLoader2 className="size-4 animate-spin" /> : <IconCheck className="size-4" />}
+                                                Save All Grades
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            {allRecords.some(r => r.grade) && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-9 gap-2 font-semibold shadow-none border-zinc-200"
+                                                    onClick={() => startBulkEdit(allRecords.filter(r => r.grade).map(r => r.grade!))}
+                                                >
+                                                    <IconPencil className="size-4" />
+                                                    Edit All Grades
+                                                </Button>
+                                            )}
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-9 gap-2 font-semibold shadow-none border-zinc-200"
+                                                onClick={() => setIsManageModalOpen(true)}
+                                            >
+                                                <IconSettings className="size-4" />
+                                                Manage Enrollment
+                                            </Button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </CardHeader>
@@ -693,6 +820,16 @@ export default function StudentProfilePage() {
                                                             className="w-16 h-8 text-center text-sm mx-auto"
                                                             autoFocus
                                                         />
+                                                    ) : isBulkEditing && grade && bulkEditValues[grade.id] ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            max="5"
+                                                            value={bulkEditValues[grade.id]?.prelim || ""}
+                                                            onChange={(e) => updateGradeValue(grade.id, 'prelim', e.target.value)}
+                                                            className="w-16 h-8 text-center text-sm mx-auto"
+                                                        />
                                                     ) : (
                                                         grade?.prelim !== null && grade?.prelim !== undefined ? formatGrade(grade.prelim) : <span className="text-zinc-300">—</span>
                                                     )}
@@ -708,6 +845,16 @@ export default function StudentProfilePage() {
                                                             max="5"
                                                             value={editValues.midterm}
                                                             onChange={(e) => setEditValues({ ...editValues, midterm: e.target.value })}
+                                                            className="w-16 h-8 text-center text-sm mx-auto"
+                                                        />
+                                                    ) : isBulkEditing && grade && bulkEditValues[grade.id] ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            max="5"
+                                                            value={bulkEditValues[grade.id]?.midterm || ""}
+                                                            onChange={(e) => updateGradeValue(grade.id, 'midterm', e.target.value)}
                                                             className="w-16 h-8 text-center text-sm mx-auto"
                                                         />
                                                     ) : (
@@ -727,6 +874,16 @@ export default function StudentProfilePage() {
                                                             onChange={(e) => setEditValues({ ...editValues, finals: e.target.value })}
                                                             className="w-16 h-8 text-center text-sm mx-auto"
                                                         />
+                                                    ) : isBulkEditing && grade && bulkEditValues[grade.id] ? (
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            max="5"
+                                                            value={bulkEditValues[grade.id]?.finals || ""}
+                                                            onChange={(e) => updateGradeValue(grade.id, 'finals', e.target.value)}
+                                                            className="w-16 h-8 text-center text-sm mx-auto"
+                                                        />
                                                     ) : (
                                                         grade?.finals !== null && grade?.finals !== undefined ? formatGrade(grade.finals) : <span className="text-zinc-300">—</span>
                                                     )}
@@ -741,6 +898,12 @@ export default function StudentProfilePage() {
                                                                 ? "bg-emerald-50/50 text-emerald-700"
                                                                 : "bg-red-50/50 text-red-700"
                                                         ) : "text-zinc-400 bg-zinc-50/30"
+                                                    ) : isBulkEditing && grade && bulkEditValues[grade.id] ? (
+                                                        bulkEditValues[grade.id].prelim && bulkEditValues[grade.id].midterm && bulkEditValues[grade.id].finals ? (
+                                                            ((parseFloat(bulkEditValues[grade.id].prelim) * 0.3) + (parseFloat(bulkEditValues[grade.id].midterm) * 0.3) + (parseFloat(bulkEditValues[grade.id].finals) * 0.4)) <= 3.0
+                                                                ? "bg-emerald-50/50 text-emerald-700"
+                                                                : "bg-red-50/50 text-red-700"
+                                                        ) : "text-zinc-400 bg-zinc-50/30"
                                                     ) : getNumericGrade(grade?.finalGrade) !== null ? (
                                                         getNumericGrade(grade?.finalGrade)! <= 3.0
                                                             ? "bg-emerald-50 text-emerald-700"
@@ -750,6 +913,10 @@ export default function StudentProfilePage() {
                                                     {editingGradeId === grade?.id ? (
                                                         editValues.prelim && editValues.midterm && editValues.finals
                                                             ? ((parseFloat(editValues.prelim) * 0.3) + (parseFloat(editValues.midterm) * 0.3) + (parseFloat(editValues.finals) * 0.4)).toFixed(2)
+                                                            : "—"
+                                                    ) : isBulkEditing && grade && bulkEditValues[grade.id] ? (
+                                                        bulkEditValues[grade.id].prelim && bulkEditValues[grade.id].midterm && bulkEditValues[grade.id].finals
+                                                            ? ((parseFloat(bulkEditValues[grade.id].prelim) * 0.3) + (parseFloat(bulkEditValues[grade.id].midterm) * 0.3) + (parseFloat(bulkEditValues[grade.id].finals) * 0.4)).toFixed(2)
                                                             : "—"
                                                     ) : formatGrade(grade?.finalGrade)}
                                                 </TableCell>
@@ -762,6 +929,11 @@ export default function StudentProfilePage() {
                                                             const finalGrade = (parseFloat(editValues.prelim) * 0.3) + (parseFloat(editValues.midterm) * 0.3) + (parseFloat(editValues.finals) * 0.4);
                                                             remarks = finalGrade <= 3.0 ? "Passed" : "Failed";
                                                         } else if (editingGradeId === grade?.id) {
+                                                            remarks = "Pending";
+                                                        } else if (isBulkEditing && grade && bulkEditValues[grade.id]?.prelim && bulkEditValues[grade.id]?.midterm && bulkEditValues[grade.id]?.finals) {
+                                                            const finalGrade = (parseFloat(bulkEditValues[grade.id].prelim) * 0.3) + (parseFloat(bulkEditValues[grade.id].midterm) * 0.3) + (parseFloat(bulkEditValues[grade.id].finals) * 0.4);
+                                                            remarks = finalGrade <= 3.0 ? "Passed" : "Failed";
+                                                        } else if (isBulkEditing && grade && bulkEditValues[grade.id]) {
                                                             remarks = "Pending";
                                                         }
                                                         return (
@@ -782,7 +954,7 @@ export default function StudentProfilePage() {
                                                     })()}
                                                 </TableCell>
 
-                                                {/* Actions Column - Inline Edit */}
+                                                {/* Actions Column - Single Edit or Bulk mode indicator */}
                                                 <TableCell className="text-center pr-6 py-4 align-middle">
                                                     {editingGradeId === grade?.id ? (
                                                         <div className="flex gap-1 justify-center">
@@ -806,6 +978,8 @@ export default function StudentProfilePage() {
                                                                 <IconX className="size-4" />
                                                             </Button>
                                                         </div>
+                                                    ) : isBulkEditing && grade ? (
+                                                        <span className="text-xs text-zinc-400 italic">Editing...</span>
                                                     ) : grade ? (
                                                         <Button
                                                             variant="ghost"

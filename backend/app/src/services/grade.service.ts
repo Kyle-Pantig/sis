@@ -323,4 +323,77 @@ export class GradeService {
         }
         return result;
     }
+
+    static async bulkUpdateGrades(
+        updates: Array<{ id: string; prelim?: number | null; midterm?: number | null; finals?: number | null; remarks?: string }>,
+        userId?: string
+    ) {
+        if (updates.length === 0) return { count: 0, updated: [] };
+
+        // Get all existing grades to calculate final grades
+        const gradeIds = updates.map(u => u.id);
+        const existingGrades = await prisma.grade.findMany({
+            where: { id: { in: gradeIds } },
+            select: {
+                id: true,
+                prelim: true,
+                midterm: true,
+                finals: true,
+                student: { select: { firstName: true, lastName: true, studentNo: true } },
+                subject: { select: { code: true } },
+            }
+        });
+
+        const existingMap = new Map(existingGrades.map(g => [g.id, g]));
+
+        // Execute all updates in a single transaction
+        const results = await prisma.$transaction(
+            updates.map(update => {
+                const existing = existingMap.get(update.id);
+                if (!existing) return prisma.grade.findUnique({ where: { id: update.id } }); // Skip non-existent
+
+                const prelim = update.prelim !== undefined ? update.prelim : (existing.prelim ? Number(existing.prelim) : null);
+                const midterm = update.midterm !== undefined ? update.midterm : (existing.midterm ? Number(existing.midterm) : null);
+                const finals = update.finals !== undefined ? update.finals : (existing.finals ? Number(existing.finals) : null);
+                const finalGrade = calculateFinalGrade(prelim, midterm, finals);
+
+                // Auto-calculate remarks if all grades present
+                let remarks = update.remarks;
+                if (prelim !== null && midterm !== null && finals !== null && !remarks) {
+                    remarks = finalGrade !== null && finalGrade <= 3.0 ? "Passed" : "Failed";
+                }
+
+                return prisma.grade.update({
+                    where: { id: update.id },
+                    data: {
+                        ...(update.prelim !== undefined && { prelim: update.prelim ?? null }),
+                        ...(update.midterm !== undefined && { midterm: update.midterm ?? null }),
+                        ...(update.finals !== undefined && { finals: update.finals ?? null }),
+                        finalGrade: finalGrade ?? null,
+                        ...(remarks !== undefined && { remarks }),
+                    },
+                });
+            })
+        );
+
+        // Audit log (non-blocking)
+        if (userId) {
+            const auditDetails = updates.map(u => {
+                const existing = existingMap.get(u.id);
+                return {
+                    student: existing ? `${existing.student.firstName} ${existing.student.lastName}` : 'Unknown',
+                    subject: existing?.subject.code || 'Unknown',
+                    prelim: u.prelim,
+                    midterm: u.midterm,
+                    finals: u.finals,
+                };
+            });
+            AuditService.log(userId, "BULK_UPDATE_GRADES", "Grade", "bulk", {
+                count: updates.length,
+                grades: auditDetails
+            }).catch(console.error);
+        }
+
+        return { count: results.filter(r => r !== null).length, updated: results };
+    }
 }

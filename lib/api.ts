@@ -180,6 +180,11 @@ export const gradesApi = {
         method: "PATCH",
         body: JSON.stringify(data),
     }),
+    bulkUpdate: (updates: Array<{ id: string; prelim?: number | null; midterm?: number | null; finals?: number | null; remarks?: string }>) =>
+        fetchApi<{ count: number; updated: any[] } & { error?: string }>("/api/grades/bulk", {
+            method: "PATCH",
+            body: JSON.stringify({ updates }),
+        }),
     delete: (id: string) => fetchApi<any>(`/api/grades/${id}`, {
         method: "DELETE",
     }),
