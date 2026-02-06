@@ -118,6 +118,7 @@ All endpoints are prefixed with `/api`.
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
 | `GET` | `/students` | List students (paginated, searchable) |
+| `GET` | `/students/count` | Get total student count |
 | `GET` | `/students/:id` | Get detailed student profile |
 | `POST` | `/students` | Register a new student |
 | `PATCH` | `/students/:id` | Update student information |
@@ -128,26 +129,33 @@ All endpoints are prefixed with `/api`.
 ### 📚 Courses
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `GET` | `/courses` | List all available courses |
+| `GET` | `/courses` | List all available courses (paginated) |
+| `GET` | `/courses/check-code` | Check if course code already exists |
 | `GET` | `/courses/:id` | Get specific course details |
 | `POST` | `/courses` | Create a new academic program |
 | `PATCH` | `/courses/:id` | Update course name/code |
 | `DELETE` | `/courses/:id` | Delete course (contains dependency checks) |
+| `DELETE` | `/courses/bulk` | Bulk delete multiple courses |
 
 ### 📖 Subjects
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `GET` | `/subjects` | List all subjects across courses |
+| `GET` | `/subjects` | List all subjects across courses (paginated) |
+| `GET` | `/subjects/check-availability` | Check if subject code/title exists in course |
 | `GET` | `/subjects/course/:courseId` | Filter subjects by program |
+| `GET` | `/subjects/:id` | Get specific subject details |
 | `POST` | `/subjects` | Add a subject to a course |
 | `PATCH` | `/subjects/:id` | Update subject code/title/units |
 | `DELETE` | `/subjects/:id` | Remove a subject |
+| `DELETE` | `/subjects/bulk` | Bulk delete multiple subjects |
 
 ### ✍️ Grading Sheet
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
 | `GET` | `/grades` | List all grade records with filters |
 | `GET` | `/grades/student/:studentId` | Get academic transcript for a student |
+| `GET` | `/grades/subject/:subjectId` | Get all grades for a specific subject |
+| `GET` | `/grades/:id` | Get specific grade record |
 | `POST` | `/grades` | Create a new grade entry |
 | `PUT` | `/grades/upsert` | Create or update grade (Admin/Encoder) |
 | `PATCH` | `/grades/:id` | Update specific scores (prelim/midterm/final) |
@@ -156,15 +164,35 @@ All endpoints are prefixed with `/api`.
 ### 📝 Reservations
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `POST` | `/reservations` | Enroll student in a subject |
 | `GET` | `/reservations/student/:studentId` | List student's enrolled subjects |
-| `DELETE` | `/reservations/:id` | Cancel/Remove subject enrollment |
+| `GET` | `/reservations/available/:studentId` | Get available subjects for enrollment |
+| `POST` | `/reservations` | Enroll student in a subject |
+| `POST` | `/reservations/bulk` | Bulk enroll student in multiple subjects |
+| `PATCH` | `/reservations/:id/cancel` | Cancel a reservation |
+| `DELETE` | `/reservations/:id` | Remove subject enrollment |
+| `DELETE` | `/reservations/bulk` | Bulk remove multiple enrollments |
 
-### 📊 System & Admin
+### 📊 Dashboard & Stats
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
 | `GET` | `/stats` | Get dashboard summary metrics |
 | `GET` | `/stats/courses` | Get enrollment distribution data |
-| `GET` | `/audit` | Access global system activity logs |
-| `GET` | `/users/encoders` | Manage staff/encoder accounts |
-| `POST` | `/users/encoders` | Invite a new staff member |
+
+### 🔍 Audit Logs
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/audit` | Access global system activity logs (paginated) |
+| `GET` | `/audit/filters` | Get available filter options (actions, entities) |
+| `DELETE` | `/audit/:id` | Delete a single audit log entry |
+| `DELETE` | `/audit/bulk` | Bulk delete multiple audit log entries |
+
+### 👥 User Management
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/users/encoders` | List all encoder accounts |
+| `POST` | `/users/encoders` | Invite a new encoder/staff member |
+| `GET` | `/users/invitations` | List pending encoder invitations |
+| `DELETE` | `/users/invitations/:id` | Revoke a pending invitation |
+| `POST` | `/users/invitations/:id/resend` | Resend invitation email |
+| `PATCH` | `/users/:id/status` | Toggle user active/inactive status |
+| `DELETE` | `/users/:id` | Delete an encoder account |
