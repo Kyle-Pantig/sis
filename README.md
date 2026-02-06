@@ -93,7 +93,7 @@ pnpm dev
 
 ## 🛠 Tech Stack
 
-- **Frontend**: Next.js 15, React 19, Tailwind CSS, TanStack Query, Framer Motion, Recharts.
+- **Frontend**: Next.js 16, React 19, Tailwind CSS, TanStack Query, Framer Motion, Recharts.
 - **Backend**: Elysia JS (Bun-native), Prisma ORM.
 - **Database**: PostgreSQL.
 - **Validation**: Zod (Frontend & Backend).
