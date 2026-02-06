@@ -739,44 +739,75 @@ function LogDetailsRenderer({ details }: { details: any }) {
                         {val === null ? (
                             "-"
                         ) : Array.isArray(val) ? (
-                            <div className={cn("mt-1", val.length > 0 && typeof val[0] !== 'object' ? "flex flex-wrap gap-1.5" : "flex flex-col gap-1.5")}>
-                                {val.map((item: any, i: number) => {
-                                    if (typeof item === 'string') {
-                                        return (
-                                            <div key={i} className="text-xs bg-zinc-100 px-2 py-1 rounded inline-block font-mono border border-zinc-200 text-zinc-600">
-                                                {item}
+                            (() => {
+                                const isObjArray = val.length > 0 && typeof val[0] === 'object' && val[0] !== null;
+                                const commonFields: Record<string, any> = {};
+
+                                if (isObjArray) {
+                                    const keys = Object.keys(val[0]);
+                                    keys.forEach(key => {
+                                        const firstVal = val[0][key];
+                                        if (val.every((item: any) => String(item[key]) === String(firstVal))) {
+                                            commonFields[key] = firstVal;
+                                        }
+                                    });
+                                }
+
+                                return (
+                                    <div className="mt-1">
+                                        {Object.keys(commonFields).length > 0 && (
+                                            <div className="mb-2 bg-zinc-50 border border-dashed border-zinc-200 p-2 rounded flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                                                {Object.entries(commonFields).map(([k, v]) => (
+                                                    <div key={k} className="flex items-center gap-1">
+                                                        <span className="text-zinc-500 capitalize">{k}:</span>
+                                                        <span className="font-semibold text-zinc-800">{String(v)}</span>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        );
-                                    }
-                                    if (typeof item === 'object' && item !== null) {
-                                        return (
-                                            <div key={i} className="text-xs bg-zinc-50 border border-zinc-200 p-2 rounded grid grid-cols-2 gap-x-4 gap-y-1">
-                                                {Object.entries(item).map(([k, v]) => {
-                                                    const strVal = v === null ? '-' : String(v);
-                                                    const isChange = strVal.includes("→");
+                                        )}
+                                        <div className={cn(isObjArray ? "flex flex-col gap-1.5" : "flex flex-wrap gap-1.5")}>
+                                            {val.map((item: any, i: number) => {
+                                                if (typeof item === 'string') {
                                                     return (
-                                                        <div key={k} className="flex justify-between gap-2 overflow-hidden items-center">
-                                                            <span className="text-zinc-500 capitalize truncate shrink-0 max-w-[40%]">{k}:</span>
-                                                            <div className="font-medium text-zinc-900 truncate flex items-center justify-end w-full" title={strVal}>
-                                                                {isChange ? (
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <span className="text-zinc-400 line-through decoration-zinc-300 font-normal">{strVal.split('→')[0].trim()}</span>
-                                                                        <span className="text-zinc-300 text-[10px]">→</span>
-                                                                        <span className="text-zinc-900 font-semibold">{strVal.split('→')[1].trim()}</span>
-                                                                    </div>
-                                                                ) : (
-                                                                    strVal
-                                                                )}
-                                                            </div>
+                                                        <div key={i} className="text-xs bg-zinc-100 px-2 py-1 rounded inline-block font-mono border border-zinc-200 text-zinc-600">
+                                                            {item}
                                                         </div>
                                                     );
-                                                })}
-                                            </div>
-                                        )
-                                    }
-                                    return <span key={i}>{String(item)}</span>
-                                })}
-                            </div>
+                                                }
+                                                if (typeof item === 'object' && item !== null) {
+                                                    const uniqueEntries = Object.entries(item).filter(([k]) => !(k in commonFields));
+                                                    if (uniqueEntries.length === 0) return null;
+                                                    return (
+                                                        <div key={i} className="text-xs bg-zinc-50 border border-zinc-200 p-2 rounded grid grid-cols-2 gap-x-4 gap-y-1">
+                                                            {uniqueEntries.map(([k, v]) => {
+                                                                const strVal = v === null ? '-' : String(v);
+                                                                const isChange = strVal.includes("→");
+                                                                return (
+                                                                    <div key={k} className="flex justify-between gap-2 overflow-hidden items-center">
+                                                                        <span className="text-zinc-500 capitalize truncate shrink-0 max-w-[40%]">{k}:</span>
+                                                                        <div className="font-medium text-zinc-900 truncate flex items-center justify-end w-full" title={strVal}>
+                                                                            {isChange ? (
+                                                                                <div className="flex items-center gap-1.5">
+                                                                                    <span className="text-zinc-400 line-through decoration-zinc-300 font-normal">{strVal.split('→')[0].trim()}</span>
+                                                                                    <span className="text-zinc-300 text-[10px]">→</span>
+                                                                                    <span className="text-zinc-900 font-semibold">{strVal.split('→')[1].trim()}</span>
+                                                                                </div>
+                                                                            ) : (
+                                                                                strVal
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )
+                                                }
+                                                return <span key={i}>{String(item)}</span>
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })()
                         ) : typeof val === "object" ? (
                             <pre className="mt-1 text-xs bg-zinc-100 p-2 rounded border border-zinc-200 overflow-x-auto">
                                 {JSON.stringify(val, null, 2)}
@@ -786,7 +817,8 @@ function LogDetailsRenderer({ details }: { details: any }) {
                         )}
                     </div>
                 </div>
-            ))}
-        </div>
+            ))
+            }
+        </div >
     );
 }

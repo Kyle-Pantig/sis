@@ -237,6 +237,8 @@ export class GradeService {
         if (userId) {
             const changes: any = {
                 student: `${result.student.lastName}, ${result.student.firstName}`,
+                studentNo: result.student.studentNo,
+                course: result.course.code,
                 subject: result.subject.code
             };
             if (data.prelim !== undefined) changes.prelim = { from: existing.prelim, to: data.prelim };
@@ -349,6 +351,7 @@ export class GradeService {
                 finals: true,
                 student: { select: { firstName: true, lastName: true, studentNo: true } },
                 subject: { select: { code: true } },
+                course: { select: { code: true } },
             }
         });
 
@@ -392,6 +395,8 @@ export class GradeService {
 
                 const details: any = {
                     student: existing ? `${existing.student.firstName} ${existing.student.lastName}` : 'Unknown',
+                    studentNo: existing?.student.studentNo || '-',
+                    course: (existing as any)?.course?.code || '-',
                     subject: existing?.subject.code || 'Unknown',
                 };
 
@@ -415,7 +420,6 @@ export class GradeService {
                 return details;
             });
             AuditService.log(userId, "BULK_UPDATE_GRADES", "Grade", "bulk", {
-                count: updates.length,
                 grades: auditDetails
             }).catch(console.error);
         }
