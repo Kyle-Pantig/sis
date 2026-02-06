@@ -61,6 +61,7 @@ import { IconSearch } from "@tabler/icons-react";
 import { GenericCombobox } from "@/components/generic-combobox";
 import { DatePicker } from "@/components/date-picker";
 import { CalendarIcon, ListFilter } from "lucide-react";
+import { ScrollArea } from "../ui/scroll-area";
 
 export function AuditLogsTab() {
     const { user } = useAuth();
@@ -649,13 +650,13 @@ function AuditDetailsButton({ log }: { log: any }) {
                         Transaction: <span className="font-mono text-xs bg-zinc-100 px-1.5 py-0.5 rounded">{log.id.slice(0, 8)}...</span>
                     </DialogDescription>
                 </DialogHeader>
-                <div className="mt-2">
+                <ScrollArea className="max-h-[60vh]">
                     {parseError ? (
                         <pre className="text-xs font-mono text-zinc-700 bg-zinc-50 p-4 rounded-lg">{details}</pre>
                     ) : (
                         <LogDetailsRenderer details={details} />
                     )}
-                </div>
+                </ScrollArea>
             </DialogContent>
         </Dialog>
     );
@@ -719,9 +720,44 @@ function LogDetailsRenderer({ details }: { details: any }) {
                     <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
                         {key.replace(/([A-Z])/g, " $1").trim()}
                     </span>
-                    <span className="text-sm font-semibold text-zinc-900 font-mono break-all leading-relaxed">
-                        {val === null ? "-" : String(val)}
-                    </span>
+                    <div className="text-sm font-semibold text-zinc-900 font-mono break-all leading-relaxed">
+                        {val === null ? (
+                            "-"
+                        ) : Array.isArray(val) ? (
+                            <div className={cn("mt-1", val.length > 0 && typeof val[0] !== 'object' ? "flex flex-wrap gap-1.5" : "flex flex-col gap-1.5")}>
+                                {val.map((item: any, i: number) => {
+                                    if (typeof item === 'string') {
+                                        return (
+                                            <div key={i} className="text-xs bg-zinc-100 px-2 py-1 rounded inline-block font-mono border border-zinc-200 text-zinc-600">
+                                                {item}
+                                            </div>
+                                        );
+                                    }
+                                    if (typeof item === 'object' && item !== null) {
+                                        return (
+                                            <div key={i} className="text-xs bg-zinc-50 border border-zinc-200 p-2 rounded grid grid-cols-2 gap-x-4 gap-y-1">
+                                                {Object.entries(item).map(([k, v]) => (
+                                                    <div key={k} className="flex justify-between gap-2 overflow-hidden items-center">
+                                                        <span className="text-zinc-500 capitalize truncate shrink-0 max-w-[50%]">{k}:</span>
+                                                        <span className="font-medium text-zinc-900 truncate" title={v === null ? '-' : String(v)}>
+                                                            {v === null ? '-' : String(v)}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )
+                                    }
+                                    return <span key={i}>{String(item)}</span>
+                                })}
+                            </div>
+                        ) : typeof val === "object" ? (
+                            <pre className="mt-1 text-xs bg-zinc-100 p-2 rounded border border-zinc-200 overflow-x-auto">
+                                {JSON.stringify(val, null, 2)}
+                            </pre>
+                        ) : (
+                            String(val)
+                        )}
+                    </div>
                 </div>
             ))}
         </div>

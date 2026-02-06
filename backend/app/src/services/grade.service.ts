@@ -385,13 +385,31 @@ export class GradeService {
         if (userId) {
             const auditDetails = updates.map(u => {
                 const existing = existingMap.get(u.id);
-                return {
+                const formatVal = (v: any) => v === null || v === undefined ? '-' : String(v);
+
+                const details: any = {
                     student: existing ? `${existing.student.firstName} ${existing.student.lastName}` : 'Unknown',
                     subject: existing?.subject.code || 'Unknown',
-                    prelim: u.prelim,
-                    midterm: u.midterm,
-                    finals: u.finals,
                 };
+
+                if (existing) {
+                    if (u.prelim !== undefined) {
+                        const oldP = existing.prelim ? Number(existing.prelim) : null;
+                        if (oldP !== u.prelim) details.prelim = `${formatVal(oldP)} → ${formatVal(u.prelim)}`;
+                        else details.prelim = formatVal(u.prelim);
+                    }
+                    if (u.midterm !== undefined) {
+                        const oldM = existing.midterm ? Number(existing.midterm) : null;
+                        if (oldM !== u.midterm) details.midterm = `${formatVal(oldM)} → ${formatVal(u.midterm)}`;
+                        else details.midterm = formatVal(u.midterm);
+                    }
+                    if (u.finals !== undefined) {
+                        const oldF = existing.finals ? Number(existing.finals) : null;
+                        if (oldF !== u.finals) details.finals = `${formatVal(oldF)} → ${formatVal(u.finals)}`;
+                        else details.finals = formatVal(u.finals);
+                    }
+                }
+                return details;
             });
             AuditService.log(userId, "BULK_UPDATE_GRADES", "Grade", "bulk", {
                 count: updates.length,
