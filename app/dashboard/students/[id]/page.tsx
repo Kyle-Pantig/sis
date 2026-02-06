@@ -91,10 +91,20 @@ export default function StudentProfilePage() {
         midterm: string;
         finals: string;
     }>({ prelim: "", midterm: "", finals: "" });
+    const [initialEditValues, setInitialEditValues] = useState<{
+        prelim: string;
+        midterm: string;
+        finals: string;
+    }>({ prelim: "", midterm: "", finals: "" });
 
     // Bulk inline grade editing state
     const [isBulkEditing, setIsBulkEditing] = useState(false);
     const [bulkEditValues, setBulkEditValues] = useState<Record<string, {
+        prelim: string;
+        midterm: string;
+        finals: string;
+    }>>({});
+    const [initialBulkEditValues, setInitialBulkEditValues] = useState<Record<string, {
         prelim: string;
         midterm: string;
         finals: string;
@@ -213,19 +223,29 @@ export default function StudentProfilePage() {
 
     const isUpdatingGrade = updateGradeMutation.isPending;
 
+    // Check if single edit has changes
+    const hasSingleEditChanges = editingGradeId !== null && (
+        editValues.prelim !== initialEditValues.prelim ||
+        editValues.midterm !== initialEditValues.midterm ||
+        editValues.finals !== initialEditValues.finals
+    );
+
     // Single-row inline editing helper functions
     function startEditGrade(grade: { id: string; prelim?: number | string | null; midterm?: number | string | null; finals?: number | string | null }) {
         setEditingGradeId(grade.id);
-        setEditValues({
+        const values = {
             prelim: grade.prelim !== null && grade.prelim !== undefined ? String(grade.prelim) : "",
             midterm: grade.midterm !== null && grade.midterm !== undefined ? String(grade.midterm) : "",
             finals: grade.finals !== null && grade.finals !== undefined ? String(grade.finals) : "",
-        });
+        };
+        setEditValues(values);
+        setInitialEditValues(values);
     }
 
     function cancelEditGrade() {
         setEditingGradeId(null);
         setEditValues({ prelim: "", midterm: "", finals: "" });
+        setInitialEditValues({ prelim: "", midterm: "", finals: "" });
     }
 
     async function saveEditGrade(gradeId: string) {
@@ -255,7 +275,8 @@ export default function StudentProfilePage() {
                 e.preventDefault();
                 cancelEditGrade();
             }
-            if (e.key === "Enter" && !e.shiftKey) {
+            // Only save if there are changes
+            if (e.key === "Enter" && !e.shiftKey && hasSingleEditChanges) {
                 e.preventDefault();
                 saveEditGrade(editingGradeId);
             }
@@ -263,7 +284,7 @@ export default function StudentProfilePage() {
 
         document.addEventListener("keydown", handleKeyDown);
         return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [editingGradeId, editValues]);
+    }, [editingGradeId, editValues, hasSingleEditChanges]);
 
     // Bulk grade update mutation
     const bulkUpdateGradeMutation = useMutation({
@@ -286,6 +307,15 @@ export default function StudentProfilePage() {
 
     const isUpdatingGrades = bulkUpdateGradeMutation.isPending;
 
+    // Check if bulk edit has any changes
+    const hasBulkEditChanges = isBulkEditing && Object.entries(bulkEditValues).some(([id, values]) => {
+        const initial = initialBulkEditValues[id];
+        if (!initial) return true;
+        return values.prelim !== initial.prelim ||
+            values.midterm !== initial.midterm ||
+            values.finals !== initial.finals;
+    });
+
     // Bulk editing helper functions
     function startBulkEdit(grades: Array<{ id: string; prelim?: number | string | null; midterm?: number | string | null; finals?: number | string | null }>) {
         const initialValues: Record<string, { prelim: string; midterm: string; finals: string }> = {};
@@ -297,12 +327,14 @@ export default function StudentProfilePage() {
             };
         });
         setBulkEditValues(initialValues);
+        setInitialBulkEditValues(initialValues);
         setIsBulkEditing(true);
     }
 
     function cancelBulkEdit() {
         setIsBulkEditing(false);
         setBulkEditValues({});
+        setInitialBulkEditValues({});
     }
 
     function updateGradeValue(gradeId: string, field: 'prelim' | 'midterm' | 'finals', value: string) {
@@ -338,7 +370,8 @@ export default function StudentProfilePage() {
                 e.preventDefault();
                 cancelBulkEdit();
             }
-            if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+            // Only save if there are changes
+            if ((e.ctrlKey || e.metaKey) && e.key === "s" && hasBulkEditChanges) {
                 e.preventDefault();
                 saveBulkGrades();
             }
@@ -346,7 +379,7 @@ export default function StudentProfilePage() {
 
         document.addEventListener("keydown", handleKeyDown);
         return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [isBulkEditing, bulkEditValues]);
+    }, [isBulkEditing, bulkEditValues, hasBulkEditChanges]);
 
     const { data: courseSubjects, isLoading: loadingSubjects } = useQuery({
         queryKey: ["course-subjects", student?.course.id],
@@ -719,23 +752,29 @@ export default function StudentProfilePage() {
                                                 className="h-9 gap-2 font-semibold shadow-none border-zinc-200"
                                                 onClick={cancelBulkEdit}
                                                 disabled={isUpdatingGrades}
+                                                title="Press ESC to cancel"
                                             >
                                                 <IconX className="size-4" />
                                                 Cancel
+                                                <kbd className="ml-1 px-1.5 py-0.5 text-[10px] font-mono bg-zinc-100 rounded border border-zinc-200 text-zinc-500">ESC</kbd>
                                             </Button>
-                                            <Button
-                                                size="sm"
-                                                className="h-9 gap-2 font-semibold shadow-none bg-primary hover:bg-primary/80"
-                                                onClick={saveBulkGrades}
-                                                disabled={isUpdatingGrades}
-                                            >
-                                                {isUpdatingGrades ? <IconLoader2 className="size-4 animate-spin" /> : <IconCheck className="size-4" />}
-                                                Save All Grades
-                                            </Button>
+                                            {hasBulkEditChanges && (
+                                                <Button
+                                                    size="sm"
+                                                    className="h-9 gap-2 font-semibold shadow-none bg-primary hover:bg-primary/80"
+                                                    onClick={saveBulkGrades}
+                                                    disabled={isUpdatingGrades}
+                                                    title="Press Ctrl+S to save all"
+                                                >
+                                                    {isUpdatingGrades ? <IconLoader2 className="size-4 animate-spin" /> : <IconCheck className="size-4" />}
+                                                    Save
+                                                    <kbd className="ml-1 px-1.5 py-0.5 text-[10px] font-mono bg-secondary rounded border text-muted-foreground">Ctrl+S</kbd>
+                                                </Button>
+                                            )}
                                         </>
                                     ) : (
                                         <>
-                                            {allRecords.some(r => r.grade) && (
+                                            {!editingGradeId && allRecords.some(r => r.grade) && (
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
@@ -743,7 +782,7 @@ export default function StudentProfilePage() {
                                                     onClick={() => startBulkEdit(allRecords.filter(r => r.grade).map(r => r.grade!))}
                                                 >
                                                     <IconPencil className="size-4" />
-                                                    Edit All Grades
+                                                    Edit
                                                 </Button>
                                             )}
                                             <Button
@@ -957,26 +996,39 @@ export default function StudentProfilePage() {
                                                 {/* Actions Column - Single Edit or Bulk mode indicator */}
                                                 <TableCell className="text-center pr-6 py-4 align-middle">
                                                     {editingGradeId === grade?.id ? (
-                                                        <div className="flex gap-1 justify-center">
-                                                            <Button
-                                                                size="icon"
-                                                                variant="ghost"
-                                                                className="size-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                                                                onClick={() => saveEditGrade(grade.id)}
-                                                                disabled={isUpdatingGrade}
-                                                                title="Save (Enter)"
-                                                            >
-                                                                {isUpdatingGrade ? <IconLoader2 className="size-4 animate-spin" /> : <IconCheck className="size-4" />}
-                                                            </Button>
-                                                            <Button
-                                                                size="icon"
-                                                                variant="ghost"
-                                                                className="size-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                                onClick={cancelEditGrade}
-                                                                title="Cancel (Esc)"
-                                                            >
-                                                                <IconX className="size-4" />
-                                                            </Button>
+                                                        <div className="flex flex-col gap-1 items-center">
+                                                            <div className="flex gap-1 justify-center">
+                                                                {hasSingleEditChanges && (
+                                                                    <Button
+                                                                        size="icon"
+                                                                        variant="ghost"
+                                                                        className="size-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                                        onClick={() => saveEditGrade(grade.id)}
+                                                                        disabled={isUpdatingGrade}
+                                                                        title="Save (Enter)"
+                                                                    >
+                                                                        {isUpdatingGrade ? <IconLoader2 className="size-4 animate-spin" /> : <IconCheck className="size-4" />}
+                                                                    </Button>
+                                                                )}
+                                                                <Button
+                                                                    size="icon"
+                                                                    variant="ghost"
+                                                                    className="size-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                                    onClick={cancelEditGrade}
+                                                                    title="Cancel (ESC)"
+                                                                >
+                                                                    <IconX className="size-4" />
+                                                                </Button>
+                                                            </div>
+                                                            <div className="flex gap-1.5 text-[9px] text-zinc-400 font-medium">
+                                                                {hasSingleEditChanges && (
+                                                                    <>
+                                                                        <span>Enter</span>
+                                                                        <span>•</span>
+                                                                    </>
+                                                                )}
+                                                                <span>ESC</span>
+                                                            </div>
                                                         </div>
                                                     ) : isBulkEditing && grade ? (
                                                         <span className="text-xs text-zinc-400 italic">Editing...</span>

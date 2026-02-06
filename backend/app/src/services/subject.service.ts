@@ -22,12 +22,16 @@ export class SubjectService {
         const where: any = {};
 
         if (search) {
-            const searchParts = search.split(/\s+/).map(p => p.trim()).filter(p => p.length > 0);
+            // Split on whitespace and commas, remove empty strings and punctuation-only strings
+            const searchParts = search.trim()
+                .split(/[\s,]+/)
+                .map(part => part.replace(/[^\w]/g, '')) // Remove non-word characters
+                .filter(part => part.length > 0);
 
             if (searchParts.length > 1) {
                 where.OR = [
-                    { code: { contains: search, mode: "insensitive" } },
-                    { title: { contains: search, mode: "insensitive" } },
+                    { code: { contains: search.replace(/,/g, ''), mode: "insensitive" } },
+                    { title: { contains: search.replace(/,/g, ''), mode: "insensitive" } },
                     {
                         AND: searchParts.map(part => ({
                             OR: [
@@ -37,10 +41,10 @@ export class SubjectService {
                         }))
                     }
                 ];
-            } else {
+            } else if (searchParts.length === 1) {
                 where.OR = [
-                    { code: { contains: search, mode: "insensitive" } },
-                    { title: { contains: search, mode: "insensitive" } },
+                    { code: { contains: searchParts[0], mode: "insensitive" } },
+                    { title: { contains: searchParts[0], mode: "insensitive" } },
                 ];
             }
         }

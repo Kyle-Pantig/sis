@@ -159,6 +159,7 @@ All endpoints are prefixed with `/api`.
 | `POST` | `/grades` | Create a new grade entry |
 | `PUT` | `/grades/upsert` | Create or update grade (Admin/Encoder) |
 | `PATCH` | `/grades/:id` | Update specific scores (prelim/midterm/final) |
+| `PATCH` | `/grades/bulk` | Bulk update multiple grade records |
 | `DELETE` | `/grades/:id` | Remove a grade record |
 
 ### 📝 Reservations

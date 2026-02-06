@@ -58,7 +58,12 @@ export class GradeService {
         }
 
         if (search) {
-            const searchParts = search.trim().split(/\s+/);
+            // Split on whitespace and commas, remove empty strings and punctuation-only strings
+            const searchParts = search.trim()
+                .split(/[\s,]+/)
+                .map(part => part.replace(/[^\w]/g, '')) // Remove non-word characters
+                .filter(part => part.length > 0);
+
             if (searchParts.length > 1) {
                 // If multiple words, try matching first name and last name combinations
                 where.AND = searchParts.map(part => ({
@@ -70,13 +75,13 @@ export class GradeService {
                         { course: { code: { contains: part, mode: "insensitive" } } },
                     ]
                 }));
-            } else {
+            } else if (searchParts.length === 1) {
                 where.OR = [
-                    { student: { firstName: { contains: search, mode: "insensitive" } } },
-                    { student: { lastName: { contains: search, mode: "insensitive" } } },
-                    { student: { studentNo: { contains: search, mode: "insensitive" } } },
-                    { course: { name: { contains: search, mode: "insensitive" } } },
-                    { course: { code: { contains: search, mode: "insensitive" } } },
+                    { student: { firstName: { contains: searchParts[0], mode: "insensitive" } } },
+                    { student: { lastName: { contains: searchParts[0], mode: "insensitive" } } },
+                    { student: { studentNo: { contains: searchParts[0], mode: "insensitive" } } },
+                    { course: { name: { contains: searchParts[0], mode: "insensitive" } } },
+                    { course: { code: { contains: searchParts[0], mode: "insensitive" } } },
                 ];
             }
         }

@@ -28,7 +28,12 @@ export class StudentService {
         const where: any = {};
 
         if (search) {
-            const searchParts = search.trim().split(/\s+/);
+            // Split on whitespace and commas, remove empty strings and punctuation-only strings
+            const searchParts = search.trim()
+                .split(/[\s,]+/)
+                .map(part => part.replace(/[^\w]/g, '')) // Remove non-word characters
+                .filter(part => part.length > 0);
+
             if (searchParts.length > 1) {
                 where.AND = searchParts.map(part => ({
                     OR: [
@@ -40,14 +45,14 @@ export class StudentService {
                         { course: { code: { contains: part, mode: "insensitive" } } },
                     ]
                 }));
-            } else {
+            } else if (searchParts.length === 1) {
                 where.OR = [
-                    { studentNo: { contains: search, mode: "insensitive" } },
-                    { firstName: { contains: search, mode: "insensitive" } },
-                    { lastName: { contains: search, mode: "insensitive" } },
-                    { email: { contains: search, mode: "insensitive" } },
-                    { course: { name: { contains: search, mode: "insensitive" } } },
-                    { course: { code: { contains: search, mode: "insensitive" } } },
+                    { studentNo: { contains: searchParts[0], mode: "insensitive" } },
+                    { firstName: { contains: searchParts[0], mode: "insensitive" } },
+                    { lastName: { contains: searchParts[0], mode: "insensitive" } },
+                    { email: { contains: searchParts[0], mode: "insensitive" } },
+                    { course: { name: { contains: searchParts[0], mode: "insensitive" } } },
+                    { course: { code: { contains: searchParts[0], mode: "insensitive" } } },
                 ];
             }
         }

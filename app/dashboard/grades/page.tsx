@@ -602,21 +602,39 @@ export default function GradesPage() {
                             (editValues.finals || "") !== (grade.finals || "");
 
                         return (
-                            <div className="flex gap-1 justify-end">
-                                {hasChanges && (
+                            <div className="flex flex-col gap-1 items-end">
+                                <div className="flex gap-1 justify-end">
+                                    {hasChanges && (
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="size-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                            onClick={() => saveEdit(grade.id)}
+                                            disabled={isUpdating}
+                                            title="Save (Enter)"
+                                        >
+                                            {isUpdating ? <IconLoader2 className="size-4 animate-spin" /> : <IconCheck className="size-4" />}
+                                        </Button>
+                                    )}
                                     <Button
                                         size="icon"
                                         variant="ghost"
-                                        className="size-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                                        onClick={() => saveEdit(grade.id)}
-                                        disabled={isUpdating}
+                                        className="size-7 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        onClick={cancelEdit}
+                                        title="Cancel (Esc)"
                                     >
-                                        {isUpdating ? <IconLoader2 className="size-4 animate-spin" /> : <IconCheck className="size-4" />}
+                                        <IconX className="size-4" />
                                     </Button>
-                                )}
-                                <Button size="icon" variant="ghost" className="size-7 text-red-600 hover:text-red-700 hover:bg-red-50" onClick={cancelEdit}>
-                                    <IconX className="size-4" />
-                                </Button>
+                                </div>
+                                <div className="flex gap-1.5 text-[9px] text-zinc-400 font-medium pr-1">
+                                    {hasChanges && (
+                                        <>
+                                            <span>Enter</span>
+                                            <span>•</span>
+                                        </>
+                                    )}
+                                    <span>ESC</span>
+                                </div>
                             </div>
                         );
                     }
