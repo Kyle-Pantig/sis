@@ -52,7 +52,7 @@ export const studentRoutes = new Elysia({ prefix: "/students" })
                 course: t.String(),
             })),
         }),
-        requireRoles: ["admin"]
+        requireRoles: ["admin", "encoder"]
     })
     .delete("/bulk", (context: any) => StudentController.deleteStudents(context), {
         body: t.Object({

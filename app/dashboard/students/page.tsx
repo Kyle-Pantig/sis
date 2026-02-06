@@ -532,7 +532,7 @@ export default function StudentsPage() {
                                 Delete ({selectedIds.length})
                             </Button>
                         )}
-                        {user?.role === "admin" && selectedIds.length === 0 && (
+                        {(user?.role === "admin" || user?.role === "encoder") && selectedIds.length === 0 && (
                             <CSVImportDialog
                                 onImport={async (data) => {
                                     const result = await studentsApi.importCsv(data);
