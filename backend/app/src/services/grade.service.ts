@@ -235,7 +235,10 @@ export class GradeService {
         });
 
         if (userId) {
-            const changes: any = {};
+            const changes: any = {
+                student: `${result.student.lastName}, ${result.student.firstName}`,
+                subject: result.subject.code
+            };
             if (data.prelim !== undefined) changes.prelim = { from: existing.prelim, to: data.prelim };
             if (data.midterm !== undefined) changes.midterm = { from: existing.midterm, to: data.midterm };
             if (data.finals !== undefined) changes.finals = { from: existing.finals, to: data.finals };

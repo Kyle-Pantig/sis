@@ -676,6 +676,21 @@ function LogDetailsRenderer({ details }: { details: any }) {
         return (
             <div className="space-y-3">
                 {Object.entries(details).map(([key, val]: [string, any]) => {
+                    const isChangeObj = val && typeof val === 'object' && ('from' in val || 'to' in val);
+
+                    if (!isChangeObj) {
+                        return (
+                            <div key={key} className="text-sm p-3 rounded-lg border bg-zinc-50 border-zinc-100">
+                                <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">
+                                    {key.replace(/([A-Z])/g, " $1").trim()}
+                                </div>
+                                <div className="font-mono text-xs font-medium text-zinc-900 break-all">
+                                    {String(val)}
+                                </div>
+                            </div>
+                        );
+                    }
+
                     const from = val?.from ?? "-";
                     const to = val?.to ?? "-";
                     const hasChanged = String(from) !== String(to);
